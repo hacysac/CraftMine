@@ -1,0 +1,23 @@
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "BiomeAttributes", menuName = "MinecraftTutorial/Biome Attribute")]
+public class BiomeAttributes : ScriptableObject
+{
+    public string biomeName;
+    public int solidGroundHeight;
+    public int terrainHeight;
+    public float terrainScale;
+    public Lode[] lodes;
+}
+
+[System.Serializable]
+public class Lode
+{
+    public string lodeName;
+    public ushort blockID;
+    public int minHeight;
+    public int maxHeight;
+    public float scale;
+    public float noiseOffset;
+    public float threshold;
+}
