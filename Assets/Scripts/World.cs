@@ -51,13 +51,16 @@ public class World : MonoBehaviour
 
             Debug.LogError($"Block name '{blockName}' not found in blockTypes.");
             return 0; // falls back to Air
-}
+        }
+
+        private void Awake()
+{
+            BuildBlockNameLookup();
+        }
 
         private void Start()
         {
             Random.InitState(seed);
-
-            BuildBlockNameLookup();
 
             int spawnX = VoxelData.WorldSizeInVoxels / 2;
             int spawnZ = VoxelData.WorldSizeInVoxels / 2;

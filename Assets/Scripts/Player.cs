@@ -29,7 +29,7 @@ public class Player : MonoBehaviour
     public Transform placeHighlight;
     public float checkIncrement = 0.1f;
     public float reach = 8f;
-    public ushort selectedBlockType = 1;
+    public string selectedBlockType = "Grass";
 
 
     private void Start()
@@ -142,7 +142,7 @@ public class Player : MonoBehaviour
 
         if (breakHighlight.gameObject.activeSelf && Input.GetMouseButtonDown(0))
         {
-            world.getChunkFromVector3(breakHighlight.position).EditVoxel(breakHighlight.position, 0);
+            world.getChunkFromVector3(breakHighlight.position).EditVoxel(breakHighlight.position, "Air");
         }
         bool onXZ = Mathf.FloorToInt(transform.position.x) == placeHighlight.position.x && Mathf.FloorToInt(transform.position.z) == placeHighlight.position.z;
         bool onY = Mathf.FloorToInt(transform.position.y) == placeHighlight.position.y || Mathf.FloorToInt(transform.position.y) + 1 == placeHighlight.position.y;

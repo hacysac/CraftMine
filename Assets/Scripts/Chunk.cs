@@ -145,7 +145,7 @@ public class Chunk
         return true;
     }
 
-    public void EditVoxel (Vector3 pos, ushort newId)
+    public void EditVoxel (Vector3 pos, string newBlock)
     {
         int xCheck = Mathf.FloorToInt(pos.x - position.x);
         int yCheck = Mathf.FloorToInt(pos.y);
@@ -156,7 +156,7 @@ public class Chunk
             return;
         }
 
-        voxelMap[xCheck, yCheck, zCheck] = newId;
+        voxelMap[xCheck, yCheck, zCheck] = world.GetBlockIndex(newBlock);
 
         UpdateSurroundingVoxels(xCheck, yCheck, zCheck);
 
