@@ -9,6 +9,7 @@ public class World : MonoBehaviour
         public Transform player;
         public Vector3 spawnPosition;
         public Material material;
+        public Material transparentMaterial;
         public BlockType[] blockTypes;
         public BiomeAttributes biome;
         public ChunkCoord playerLastChunkCoord;
@@ -86,7 +87,7 @@ public class World : MonoBehaviour
 
                 if (firstSprite != null)
                 {
-                    material.mainTexture = firstSprite.texture;
+                    material.SetTexture("_BaseMap", firstSprite.texture);
                 }
             }
 
@@ -207,6 +208,21 @@ public class World : MonoBehaviour
             return this.blockTypes[GetVoxel(pos)].isSolid;
         }
 
+        public bool CheckIfVoxelTransparent(Vector3 pos)
+        {
+            ChunkCoord thisChunk = new ChunkCoord(pos);
+
+            if (!isVoxelInWorld(pos))
+            {
+                return false;
+            }
+            if (chunks[thisChunk.x, thisChunk.z] != null && chunks[thisChunk.x, thisChunk.z].isVoxelMapPopulated)
+            {
+                return this.blockTypes[chunks[thisChunk.x, thisChunk.z].GetVoxelFromGlobalVector3(pos)].isTransparent;
+            }
+            return this.blockTypes[GetVoxel(pos)].isTransparent;
+        }
+
         public ushort GetVoxel(Vector3 pos)
         {
             int yPos = Mathf.FloorToInt(pos.y);
@@ -292,6 +308,7 @@ public class BlockType
 {
     public string blockName;
     public bool isSolid;
+    public bool isTransparent;
     public Sprite icon;
 
     [Header("Texture Values")]

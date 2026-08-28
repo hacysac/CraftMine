@@ -6,6 +6,8 @@ public class Player : MonoBehaviour
     public Transform camera;
     public World world;
 
+    public Toolbar toolbar;
+
     public bool isGrounded;
     public bool isSprinting;
 
@@ -29,7 +31,7 @@ public class Player : MonoBehaviour
     public Transform placeHighlight;
     public float checkIncrement = 0.1f;
     public float reach = 8f;
-    public string selectedBlockType = "Grass";
+    public string selectedBlockType;
 
     GameObject[] sounds;
 
@@ -39,6 +41,7 @@ public class Player : MonoBehaviour
         camera = GameObject.Find("Main Camera").transform;
         world = GameObject.Find("World").GetComponent<World>();
         sounds = Resources.LoadAll<GameObject>("Sounds");
+        selectedBlockType = toolbar.itemSlots[0].itemName;
 
         Cursor.lockState = CursorLockMode.Locked;
     }
