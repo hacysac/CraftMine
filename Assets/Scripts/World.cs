@@ -23,9 +23,41 @@ public class World : MonoBehaviour
 
         List<ChunkCoord> chunksToCreate = new List<ChunkCoord>();
 
+        private Dictionary<string, ushort> blockNameToID;
+
+        void BuildBlockNameLookup()
+        {
+            blockNameToID = new Dictionary<string, ushort>();
+
+            for (ushort i = 0; i < blockTypes.Length; i++)
+            {
+                string name = blockTypes[i].blockName;
+
+                if (string.IsNullOrEmpty(name))
+                {
+                    Debug.LogWarning($"blockTypes[{i}] has no blockName set.");
+                    continue;
+                }
+
+                if (!blockNameToID.TryAdd(name, i))
+                    Debug.LogWarning($"Duplicate block name '{name}' at index {i} (already used by index {blockNameToID[name]}).");
+            }
+        }
+
+        public ushort GetBlockIndex(string blockName)
+        {
+            if (blockNameToID.TryGetValue(blockName, out ushort index))
+                return index;
+
+            Debug.LogError($"Block name '{blockName}' not found in blockTypes.");
+            return 0; // falls back to Air
+}
+
         private void Start()
         {
             Random.InitState(seed);
+
+            BuildBlockNameLookup();
 
             int spawnX = VoxelData.WorldSizeInVoxels / 2;
             int spawnZ = VoxelData.WorldSizeInVoxels / 2;
@@ -180,12 +212,12 @@ public class World : MonoBehaviour
             // if outside return air
             if (!isVoxelInWorld(pos))
             {
-                return 0;
+                return this.GetBlockIndex("Air");
             }
             // if at ground return bedrock
             if  (yPos == 0)
             {
-                return 9;
+                return this.GetBlockIndex("Bedrock");
             }
 
             // Basic Terrain Pass
@@ -195,24 +227,24 @@ public class World : MonoBehaviour
 
             if (yPos == terrainHeight)
             {
-                voxelValue = 3;
+                voxelValue = this.GetBlockIndex("Grass");;
             }
             else if (yPos < terrainHeight && yPos > terrainHeight - 4)
             {
-                voxelValue = 2;
+                voxelValue = this.GetBlockIndex("Dirt");;
             }
             else if (yPos > terrainHeight)
             {
-                return 0;
+                return this.GetBlockIndex("Air");;
             }
             else
             {
-                voxelValue = 1;
+                voxelValue = this.GetBlockIndex("Stone");;
             }
 
             // Second Pass
 
-            if (voxelValue == 1)
+            if (voxelValue == this.GetBlockIndex("Stone"))
             {
                 // Check for lode generation
                 foreach (Lode lode in biome.lodes)
@@ -222,7 +254,7 @@ public class World : MonoBehaviour
                         bool noise2 = Noise.Get3DPerlin(pos, lode.noiseOffset, lode.scale, lode.threshold);
                         if (noise2)
                         {
-                            voxelValue = lode.blockID;
+                            voxelValue = this.GetBlockIndex(lode.blockName);
                         }
                     }
                 }
