@@ -13,7 +13,10 @@ public class World : MonoBehaviour
         public BlockType[] blockTypes;
         public BiomeAttributes biome;
         public ChunkCoord playerLastChunkCoord;
-        private bool isCreatingChunks;
+        List<Chunk> chunksToUpdate = new List<Chunk>();
+        bool applyingModifications = false;
+
+        Queue<VoxelMod> modifications = new Queue<VoxelMod>();
 
         public SpriteAtlas blockAtlas;
 
@@ -100,9 +103,17 @@ public class World : MonoBehaviour
             {
                 CheckViewDistance();
             }
-            if (chunksToCreate.Count > 0 && !isCreatingChunks)
+            if (modifications.Count>0 && !applyingModifications)
             {
-                StartCoroutine("CreateChunks");
+                StartCoroutine(ApplyModifications());
+            }
+            if (chunksToCreate.Count > 0)
+            {
+                CreateChunk();
+            }
+            if (chunksToUpdate.Count > 0)
+            {
+                UpdateChunks();
             }
             if (Input.GetKeyDown(KeyCode.F3))
             {
@@ -112,30 +123,89 @@ public class World : MonoBehaviour
 
         void GenerateWorld()
         {
-                for (int x = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; x < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; x++)
-                {
-                        for (int z = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; z < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; z++)
-                        {
-                            ChunkCoord thisChunk = new ChunkCoord(x,z);
-                            chunks[x,z] = new Chunk(thisChunk, this, true);
-                            activeChunks.Add(thisChunk);
-                        }
-                }
-                player.position = spawnPosition;
-        }
-
-        IEnumerator CreateChunks()
-        {
-            isCreatingChunks = true;
-
-            while(chunksToCreate.Count > 0)
+            for (int x = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; x < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; x++)
             {
-                chunks[chunksToCreate[0].x, chunksToCreate[0].z].Init();
-                chunksToCreate.RemoveAt(0);
-                yield return null;
+                    for (int z = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; z < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; z++)
+                    {
+                        ChunkCoord thisChunk = new ChunkCoord(x,z);
+                        chunks[x,z] = new Chunk(thisChunk, this, true);
+                        activeChunks.Add(thisChunk);
+                    }
             }
 
-            isCreatingChunks = false;
+            while(modifications.Count > 0)
+            {
+                VoxelMod v = modifications.Dequeue();
+                ChunkCoord c = GetChunkCoordFromVector3(v.position);
+                if (chunks[c.x,c.z] == null)
+                {
+                    chunks[c.x,c.z] = new Chunk(c, this, true);
+                    activeChunks.Add(c);
+                }
+                chunks[c.x,c.z].modifications.Enqueue(v);
+                if (!chunksToUpdate.Contains(chunks[c.x, c.z]))
+                {
+                    chunksToUpdate.Add(chunks[c.x, c.z]);
+                }
+            }
+            for (int i = 0; i < chunksToUpdate.Count; i++)
+            {
+                chunksToUpdate[0].PopulateChunk();
+                chunksToUpdate.RemoveAt(0);
+            }
+
+            player.position = spawnPosition;
+        }
+
+        void CreateChunk()
+        {
+            ChunkCoord c = chunksToCreate[0];
+            chunksToCreate.RemoveAt(0);
+            activeChunks.Add(c);
+            chunks[c.x,c.z].Init();
+        }
+        void UpdateChunks()
+        {
+            bool updated = false;
+            int index = 0;
+            while (!updated && index < chunksToUpdate.Count-1)
+            {
+                if (chunksToUpdate[index].isVoxelMapPopulated)
+                {
+                    chunksToUpdate[index].PopulateChunk();
+                    chunksToUpdate.RemoveAt(index);
+                    updated = true;
+                }
+                index++;
+            }
+        }
+
+        IEnumerator ApplyModifications()
+        {
+            applyingModifications = true;
+            int count = 0;
+            while (modifications.Count > 0)
+            {
+                VoxelMod v = modifications.Dequeue();
+                ChunkCoord c = GetChunkCoordFromVector3(v.position);
+                if (chunks[c.x,c.z] == null)
+                {
+                    chunks[c.x,c.z] = new Chunk(c, this, true);
+                    activeChunks.Add(c);
+                }
+                chunks[c.x,c.z].modifications.Enqueue(v);
+                if (!chunksToUpdate.Contains(chunks[c.x, c.z]))
+                {
+                    chunksToUpdate.Add(chunks[c.x, c.z]);
+                }
+                count ++;
+                if (count > 200)
+                {
+                    count = 0;
+                    yield return null;
+                }
+            }
+            applyingModifications = false;
         }
 
         ChunkCoord GetChunkCoordFromVector3(Vector3 pos)
@@ -279,6 +349,19 @@ public class World : MonoBehaviour
                 }
             }
 
+            //Tree Pass
+
+            if(yPos == terrainHeight)
+            {
+                if (Noise.Get2DPerlin(new Vector2(pos.x, pos.z), 0, biome.treeZoneScale) > biome.treeZoneThreshold)
+                {
+                    if (Noise.Get2DPerlin(new Vector2(pos.x,pos.z), 0, biome.treePlacementScale) > biome.treePlacementThreshold)
+                    {
+                        Structure.MakeTree(pos,modifications,biome.minTreeHeight,biome.maxTreeHeight);
+                    }
+                }
+            }
+
             return voxelValue;
         }
 
@@ -339,5 +422,24 @@ public class BlockType
                 Debug.Log("Error in GetTextureID. Invalid face index.");
                 return null;
         }
+    }
+}
+
+public class VoxelMod
+{
+    public Vector3 position;
+    public ushort id;
+    World world;
+    public VoxelMod()
+    {
+        world = GameObject.Find("World").GetComponent<World>();
+        this.position = new Vector3();
+        this.id = 0;
+    }
+    public VoxelMod(Vector3 position, string id)
+    {
+        world = GameObject.Find("World").GetComponent<World>();
+        this.position = position;
+        this.id = world.GetBlockIndex(id);
     }
 }

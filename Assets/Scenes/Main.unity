@@ -1353,6 +1353,16 @@ MonoBehaviour:
     bottomFaceTexture: {fileID: 21300000, guid: 298447c149774ca4fbae9ddaa7cfe7d0, type: 3}
     leftFaceTexture: {fileID: 21300000, guid: 298447c149774ca4fbae9ddaa7cfe7d0, type: 3}
     rightFaceTexture: {fileID: 21300000, guid: 298447c149774ca4fbae9ddaa7cfe7d0, type: 3}
+  - blockName: Oak Leaves
+    isSolid: 1
+    isTransparent: 1
+    icon: {fileID: 21300000, guid: 34955c909efe5b64faa09ba983d96ecd, type: 3}
+    backFaceTexture: {fileID: 21300000, guid: 6c68269373201794ca31864534aaf7ff, type: 3}
+    frontFaceTexture: {fileID: 21300000, guid: 6c68269373201794ca31864534aaf7ff, type: 3}
+    topFaceTexture: {fileID: 21300000, guid: 6c68269373201794ca31864534aaf7ff, type: 3}
+    bottomFaceTexture: {fileID: 21300000, guid: 6c68269373201794ca31864534aaf7ff, type: 3}
+    leftFaceTexture: {fileID: 21300000, guid: 6c68269373201794ca31864534aaf7ff, type: 3}
+    rightFaceTexture: {fileID: 21300000, guid: 6c68269373201794ca31864534aaf7ff, type: 3}
   biome: {fileID: 11400000, guid: c52d1f30382c7f34baaa1cf3654df09c, type: 2}
   blockAtlas: {fileID: 100100200, guid: 2f6401fbb9f885c4693c584ebaccb2d7, type: 3}
   debugScreen: {fileID: 706622268}

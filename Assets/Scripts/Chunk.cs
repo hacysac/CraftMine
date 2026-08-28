@@ -24,6 +24,8 @@ public class Chunk
     private bool _isActive;
     public bool isVoxelMapPopulated = false;
 
+    public Queue<VoxelMod> modifications = new Queue<VoxelMod>();
+
     public Chunk(ChunkCoord chunkCoord, World world, bool generateOnLoad)
     {
         this.chunkCoord = chunkCoord;
@@ -110,8 +112,14 @@ public class Chunk
         }
     }
 
-    void PopulateChunk()
+    public void PopulateChunk()
     {
+        while(modifications.Count > 0)
+        {
+            VoxelMod v = modifications.Dequeue();
+            Vector3 pos = v.position -= position;
+            voxelMap[(int)pos.x, (int) pos.y, (int) pos.z] = v.id;
+        }
         ClearMeshData();
         for (int y = 0; y < VoxelData.ChunkHeight; y++)
         {
