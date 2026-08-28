@@ -17,17 +17,24 @@ MonoBehaviour:
   terrainHeight: 42
   terrainScale: 0.25
   lodes:
-  - lodeName: Dirt
-    blockID: 2
+  - lodeName: Dirt Deposit
+    blockName: Dirt
     minHeight: 1
-    maxHeight: 255
+    maxHeight: 128
     scale: 0.1
     noiseOffset: 0
     threshold: 0.5
-  - lodeName: Sand
-    blockID: 10
+  - lodeName: Coal Deposit
+    blockName: Coal
     minHeight: 30
-    maxHeight: 255
+    maxHeight: 128
     scale: 0.2
     noiseOffset: 500
+    threshold: 0.6
+  - lodeName: Cave
+    blockName: Air
+    minHeight: 1
+    maxHeight: 128
+    scale: 0.1
+    noiseOffset: 1000
     threshold: 0.6
