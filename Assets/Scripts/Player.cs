@@ -5,8 +5,9 @@ public class Player : MonoBehaviour
 {   
     public Transform camera;
     public World world;
-
     public Toolbar toolbar;
+    public Transform breakHighlight;
+    public Transform placeHighlight;
 
     public bool isGrounded;
     public bool isSprinting;
@@ -15,9 +16,15 @@ public class Player : MonoBehaviour
     public float sprintSpeed = 6f;
     public float jumpForce = 5f;
     public float gravity = -9.8f;
+    public float bounceTolerance = 0.1f;
+
     public float playerWidth = 0.4f;
     public float playerHeight = 1.8f;
-    public float bounceTolerance = 0.1f;
+
+    public float checkIncrement = 0.1f;
+    public float reach = 8f;
+    public string selectedBlockType;
+    
     private float horizontal;
     private float vertical;
     private float mouseX;
@@ -27,24 +34,16 @@ public class Player : MonoBehaviour
     private bool jumpRequest;
     private float xRotation = 0f;
 
-    public Transform breakHighlight;
-    public Transform placeHighlight;
-    public float checkIncrement = 0.1f;
-    public float reach = 8f;
-    public string selectedBlockType;
-
-    GameObject[] sounds;
-
 
     private void Start()
     {
         camera = GameObject.Find("Main Camera").transform;
         world = GameObject.Find("World").GetComponent<World>();
-        sounds = Resources.LoadAll<GameObject>("Sounds");
         selectedBlockType = toolbar.itemSlots[0].itemName;
 
         Cursor.lockState = CursorLockMode.Locked;
     }
+
     private void FixedUpdate()
     {
         CalculateVelocity();
@@ -54,10 +53,12 @@ public class Player : MonoBehaviour
         }
         transform.Translate(velocity, Space.World);
     }
+
     private void Update()
     {
         GetInput();
         placeCursorBlocks();
+
         transform.Rotate(Vector3.up * mouseX);
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
@@ -164,6 +165,7 @@ public class Player : MonoBehaviour
         bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + downSpeed, transform.position.z - playerWidth)) && !left && !back;
         bool corner3Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + downSpeed, transform.position.z + playerWidth)) && !right && !front;
         bool corner4Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + downSpeed, transform.position.z - playerWidth)) && !right && !back;
+        
         if (corner1Check || corner2Check || corner3Check || corner4Check)
         {
             isGrounded = true;
@@ -183,6 +185,7 @@ public class Player : MonoBehaviour
         bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z - playerWidth)) && !left && !back;
         bool corner3Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z + playerWidth)) && !front && !right;
         bool corner4Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z - playerWidth)) && !back && !right;
+        
         if (corner1Check || corner2Check || corner3Check || corner4Check)
         {
             verticalMomentum = 0;
@@ -200,6 +203,7 @@ public class Player : MonoBehaviour
         {
             bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x, transform.position.y, transform.position.z + playerWidth));
             bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x, transform.position.y + 1f, transform.position.z + playerWidth));
+            
             return corner1Check || corner2Check;
         }
     }
@@ -209,6 +213,7 @@ public class Player : MonoBehaviour
         {
             bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x, transform.position.y, transform.position.z - playerWidth));
             bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x, transform.position.y + 1f, transform.position.z - playerWidth));
+            
             return corner1Check || corner2Check;
         }
     }
@@ -218,6 +223,7 @@ public class Player : MonoBehaviour
         {
             bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y, transform.position.z));
             bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + 1f, transform.position.z));
+            
             return corner1Check || corner2Check;
         }
     }
@@ -227,6 +233,7 @@ public class Player : MonoBehaviour
         {
             bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y, transform.position.z));
             bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + 1f, transform.position.z));
+            
             return corner1Check || corner2Check;
         }
     }

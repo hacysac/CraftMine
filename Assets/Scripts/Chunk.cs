@@ -6,12 +6,14 @@ public class Chunk
 {
 
     GameObject chunkObject;
+    World world;
     public ChunkCoord chunkCoord;
-
     public MeshRenderer meshRenderer;
     public MeshFilter meshFilter;
+    public Vector3 position;
 
     int vertexIndex = 0;
+
     List<Vector3> vertices = new List<Vector3>();
     List<int> triangles = new List<int>();
     List<int> transparentTriangles = new List<int>();
@@ -19,15 +21,11 @@ public class Chunk
     List<Vector2> uvs = new List<Vector2>();
 
     public ushort [,,] voxelMap = new ushort[VoxelData.ChunkWidth, VoxelData.ChunkHeight, VoxelData.ChunkWidth];
-
-    World world;
+    public Queue<VoxelMod> modifications = new Queue<VoxelMod>();
 
     private bool _isActive;
     private bool isThreadLocked;
     private bool isVoxelMapPopulated = false;
-
-    public Queue<VoxelMod> modifications = new Queue<VoxelMod>();
-    public Vector3 position;
 
     public Chunk(ChunkCoord chunkCoord, World world, bool generateOnLoad)
     {
@@ -128,13 +126,15 @@ public class Chunk
     {
         isThreadLocked = true;
 
-        while(modifications.Count > 0)
+        while (modifications.Count > 0)
         {
             VoxelMod v = modifications.Dequeue();
             Vector3 pos = v.position -= position;
-            voxelMap[(int)pos.x, (int) pos.y, (int) pos.z] = v.id;
+            voxelMap[(int)pos.x, (int)pos.y, (int)pos.z] = v.id;
         }
+
         ClearMeshData();
+
         for (int y = 0; y < VoxelData.ChunkHeight; y++)
         {
             for (int x = 0; x < VoxelData.ChunkWidth; x++)
@@ -148,6 +148,7 @@ public class Chunk
                 }
             }
         }
+        
         lock (world.chunksToDraw)
         {
             world.chunksToDraw.Enqueue(this);
