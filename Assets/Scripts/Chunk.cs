@@ -126,15 +126,17 @@ public class Chunk
     {
         isThreadLocked = true;
 
-        while (modifications.Count > 0)
+        lock (modifications)
         {
-            VoxelMod v = modifications.Dequeue();
-            Vector3 pos = v.position -= position;
-            voxelMap[(int)pos.x, (int)pos.y, (int)pos.z] = v.id;
+            while (modifications.Count > 0)
+            {
+                VoxelMod v = modifications.Dequeue();
+                Vector3 pos = v.position -= position;
+                voxelMap[(int)pos.x, (int)pos.y, (int)pos.z] = v.id;
+            }
         }
 
         ClearMeshData();
-
         for (int y = 0; y < VoxelData.ChunkHeight; y++)
         {
             for (int x = 0; x < VoxelData.ChunkWidth; x++)
@@ -148,7 +150,6 @@ public class Chunk
                 }
             }
         }
-        
         lock (world.chunksToDraw)
         {
             world.chunksToDraw.Enqueue(this);

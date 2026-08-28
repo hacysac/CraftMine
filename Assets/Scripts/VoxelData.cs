@@ -10,10 +10,7 @@ public static class VoxelData
         get { return WorldSizeInChunks * ChunkWidth; }
     }
     public static readonly int ViewDistanceInChunks = 5;
-    public static float NormalizedBlockTextureSize
-    {
-        get { return 1f / (float)TextureAtlasSizeInBlocks; }
-    }
+
     public static readonly Vector3[] voxelVerts = new Vector3[8]
     {
         new Vector3(0.0f, 0.0f, 0.0f),

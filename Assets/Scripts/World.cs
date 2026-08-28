@@ -232,7 +232,10 @@ public class World : MonoBehaviour
                     chunks[c.x,c.z] = new Chunk(c, this, true);
                     activeChunks.Add(c);
                 }
-                chunks[c.x,c.z].modifications.Enqueue(v);
+                lock (chunks[c.x, c.z].modifications)
+                {
+                    chunks[c.x, c.z].modifications.Enqueue(v);
+                }
                 if (!chunksToUpdate.Contains(chunks[c.x, c.z]))
                 {
                     chunksToUpdate.Add(chunks[c.x, c.z]);
