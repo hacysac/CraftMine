@@ -31,11 +31,14 @@ public class Player : MonoBehaviour
     public float reach = 8f;
     public string selectedBlockType = "Grass";
 
+    GameObject[] sounds;
+
 
     private void Start()
     {
         camera = GameObject.Find("Main Camera").transform;
         world = GameObject.Find("World").GetComponent<World>();
+        sounds = Resources.LoadAll<GameObject>("Sounds");
 
         Cursor.lockState = CursorLockMode.Locked;
     }
