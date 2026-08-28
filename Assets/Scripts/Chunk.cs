@@ -151,7 +151,7 @@ public class Chunk
         int yCheck = Mathf.FloorToInt(pos.y);
         int zCheck = Mathf.FloorToInt(pos.z - position.z);
 
-        if (!isVoxelInChunk(xCheck, yCheck, zCheck))
+        if (!isVoxelInChunk(xCheck, yCheck, zCheck) || voxelMap[xCheck, yCheck, zCheck] == world.GetBlockIndex("Bedrock"))
         {
             return;
         }
