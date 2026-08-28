@@ -14,6 +14,7 @@ public class Player : MonoBehaviour
     public float jumpForce = 5f;
     public float gravity = -9.8f;
     public float playerWidth = 0.4f;
+    public float playerHeight = 1.8f;
     public float bounceTolerance = 0.1f;
     private float horizontal;
     private float vertical;
@@ -29,6 +30,7 @@ public class Player : MonoBehaviour
     public float checkIncrement = 0.1f;
     public float reach = 8f;
     public ushort selectedBlockType = 1;
+
 
     private void Start()
     {
@@ -171,10 +173,10 @@ public class Player : MonoBehaviour
     
     private float checkUpSpeed(float upSpeed)
     {
-        bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + upSpeed + 1.8f, transform.position.z + playerWidth)) && !left && !front;
-        bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + upSpeed + 1.8f, transform.position.z - playerWidth)) && !left && !back;
-        bool corner3Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + upSpeed + 1.8f, transform.position.z + playerWidth)) && !front && !right;
-        bool corner4Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + upSpeed + 1.8f, transform.position.z - playerWidth)) && !back && !right;
+        bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z + playerWidth)) && !left && !front;
+        bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z - playerWidth)) && !left && !back;
+        bool corner3Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z + playerWidth)) && !front && !right;
+        bool corner4Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z - playerWidth)) && !back && !right;
         if (corner1Check || corner2Check || corner3Check || corner4Check)
         {
             verticalMomentum = 0;
