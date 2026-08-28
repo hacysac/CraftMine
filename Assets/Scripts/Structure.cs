@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Collections;
 public static class Structure
 {
-    public static void MakeTree (Vector3 position, Queue<VoxelMod> queue, int minTrunkHeight, int maxTrunkHeight)
+    public static Queue<VoxelMod> MakeTree (Vector3 position, int minTrunkHeight, int maxTrunkHeight, World world)
     {
+        Queue<VoxelMod> queue = new Queue<VoxelMod>();
         int height = (int) (maxTrunkHeight * Noise.Get2DPerlin(new Vector2(position.x, position.z), 600f, 3f));
         if (height < minTrunkHeight)
         {
@@ -14,8 +15,8 @@ public static class Structure
         {
             for (int z = -2; z < 3; z++)
             {
-                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 2, position.z + z), "Oak Leaves"));
-                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 3, position.z + z), "Oak Leaves"));
+                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 2, position.z + z), "Oak Leaves", world));
+                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 3, position.z + z), "Oak Leaves", world));
             }
         }
 
@@ -23,7 +24,7 @@ public static class Structure
         {
             for (int z = -1; z < 2; z++)
             {
-                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 1, position.z + z), "Oak Leaves"));
+                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 1, position.z + z), "Oak Leaves", world));
             }
         }
         for (int x = -1; x < 2; x++)
@@ -31,14 +32,16 @@ public static class Structure
             if(x==0)
                 for (int z = -1; z < 2; z++)
                 {
-                    queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z + z), "Oak Leaves"));
+                    queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z + z), "Oak Leaves", world));
                 }
             else
-                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z), "Oak Leaves"));
+                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z), "Oak Leaves", world));
         }
         for (int i = 1; i < height; i++)
         {
-            queue.Enqueue(new VoxelMod(new Vector3(position.x, position.y+i, position.z), "Oak Log"));
+            queue.Enqueue(new VoxelMod(new Vector3(position.x, position.y+i, position.z), "Oak Log", world));
         }
+
+        return queue;
     }
 }

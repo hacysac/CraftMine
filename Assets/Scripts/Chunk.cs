@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Threading;
 
 public class Chunk
 {
@@ -22,9 +23,11 @@ public class Chunk
     World world;
 
     private bool _isActive;
-    public bool isVoxelMapPopulated = false;
+    private bool isThreadLocked;
+    private bool isVoxelMapPopulated = false;
 
     public Queue<VoxelMod> modifications = new Queue<VoxelMod>();
+    public Vector3 position;
 
     public Chunk(ChunkCoord chunkCoord, World world, bool generateOnLoad)
     {
@@ -51,10 +54,12 @@ public class Chunk
 
         chunkObject.transform.SetParent(world.transform);
         chunkObject.transform.position = new Vector3(chunkCoord.x * VoxelData.ChunkWidth, 0, chunkCoord.z * VoxelData.ChunkWidth);
-        chunkObject.name = "Chunk " + chunkCoord.x + ", " + chunkCoord.z;
 
-        PopulateVoxelMap();
-        PopulateChunk();
+        position = chunkObject.transform.position;   // now correctly reflects the chunk's actual world position
+        chunkObject.name += " " + (position.x/VoxelData.ChunkWidth) + "," + (position.z/VoxelData.ChunkWidth); 
+
+        Thread thread = new Thread(new ThreadStart(PopulateVoxelMap));
+        thread.Start();
     }
 
     void PopulateVoxelMap()
@@ -69,6 +74,7 @@ public class Chunk
                 }
             }
         }
+        _updateChunk();
         isVoxelMapPopulated = true;
     }
 
@@ -86,7 +92,7 @@ public class Chunk
                 vertices.Add(VoxelData.voxelVerts[VoxelData.voxelTris[j, 2]] + position);
                 vertices.Add(VoxelData.voxelVerts[VoxelData.voxelTris[j, 3]] + position);
                 
-                AddTexture(world.blockTypes[blockID].GetTextureID(j));
+                AddTexture(blockID, j);
 
                 if (!isTransparent)
                 {
@@ -112,8 +118,16 @@ public class Chunk
         }
     }
 
-    public void PopulateChunk()
+    public void UpdateChunk()
     {
+       Thread thread = new Thread(new ThreadStart(_updateChunk));
+       thread.Start();
+    }
+
+    private void _updateChunk()
+    {
+        isThreadLocked = true;
+
         while(modifications.Count > 0)
         {
             VoxelMod v = modifications.Dequeue();
@@ -134,7 +148,12 @@ public class Chunk
                 }
             }
         }
-        CreateMesh();
+        lock (world.chunksToDraw)
+        {
+            world.chunksToDraw.Enqueue(this);
+        }
+
+        isThreadLocked = false;
     }
 
     void ClearMeshData()
@@ -159,9 +178,16 @@ public class Chunk
         }
     }
 
-    public Vector3 position
+    public bool isEditable
     {
-        get { return chunkObject.transform.position; }
+        get
+        {
+            if(!isVoxelMapPopulated || isThreadLocked)
+            {
+                return false;
+            }
+            return true;
+        }
     }
 
     bool isVoxelInChunk(int x, int y, int z)
@@ -188,7 +214,7 @@ public class Chunk
 
         UpdateSurroundingVoxels(xCheck, yCheck, zCheck);
 
-        PopulateChunk();
+        _updateChunk();
     }
 
     void UpdateSurroundingVoxels(int x, int y, int z)
@@ -199,7 +225,7 @@ public class Chunk
             Vector3 currentVoxel = thisVoxel + VoxelData.faceChecks[j];
             if (!isVoxelInChunk((int) currentVoxel.x, (int) currentVoxel.y, (int)currentVoxel.z))
             {
-                world.getChunkFromVector3(currentVoxel+position).PopulateChunk();
+                world.getChunkFromVector3(currentVoxel+position).UpdateChunk();
             }
         }
     }
@@ -232,7 +258,7 @@ public class Chunk
         return world.blockTypes[voxelMap[x, y, z]].isTransparent;
     }
 
-    void CreateMesh()
+    public void CreateMesh()
     {
         Mesh mesh = new Mesh();
         mesh.vertices = vertices.ToArray();
@@ -245,34 +271,15 @@ public class Chunk
         meshFilter.mesh = mesh;
     }
 
-    void AddTexture(Sprite sprite)
+    void AddTexture(ushort blockID, int faceIndex)
     {
-            if (sprite == null)
-            {
-                // Textureless face
-                uvs.Add(Vector2.zero);
-                uvs.Add(Vector2.zero);
-                uvs.Add(Vector2.zero);
-                uvs.Add(Vector2.zero);
-                return;
-            }
+        FaceUVs uv = world.faceUVCache[blockID, faceIndex];
 
-            Rect rect = sprite.textureRect;
-
-            float texWidth = sprite.texture.width;
-            float texHeight = sprite.texture.height;
-
-            float xMin = rect.xMin / texWidth;
-            float xMax = rect.xMax / texWidth;
-
-            float yMin = rect.yMin / texHeight;
-            float yMax = rect.yMax / texHeight;
-
-            uvs.Add(new Vector2(xMin, yMin));
-            uvs.Add(new Vector2(xMin, yMax));
-            uvs.Add(new Vector2(xMax, yMin));
-            uvs.Add(new Vector2(xMax, yMax));
-            }
+        uvs.Add(uv.uv00);
+        uvs.Add(uv.uv01);
+        uvs.Add(uv.uv10);
+        uvs.Add(uv.uv11);
+    }
 
 }
 
