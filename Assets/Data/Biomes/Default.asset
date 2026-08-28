@@ -25,7 +25,7 @@ MonoBehaviour:
     noiseOffset: 0
     threshold: 0.5
   - lodeName: Coal Deposit
-    blockName: Coal
+    blockName: Coal Ore
     minHeight: 30
     maxHeight: 128
     scale: 0.2
