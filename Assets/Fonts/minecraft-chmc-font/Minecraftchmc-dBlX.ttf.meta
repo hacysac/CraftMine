@@ -3,14 +3,15 @@ guid: 32f486060cc1c6948b0a29d08f172249
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
-  fontSize: 16
-  forceTextureCase: -2
+  fontSize: 150
+  forceTextureCase: -1
   characterSpacing: 0
   characterPadding: 1
   includeFontData: 1
   fontNames:
   - MinecraftCHMC
-  fallbackFontReferences: []
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: 2b960d5539cd3214e9f4dde22dd0c3b5, type: 3}
   customCharacters: 
   fontRenderingMode: 0
   ascentCalculationMode: 1

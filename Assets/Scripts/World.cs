@@ -7,6 +7,7 @@ using System.Threading;
 public class World : MonoBehaviour
 {
     public int seed;
+    private bool _inUI = false;
 
     public Transform player;
     public Material material;
@@ -15,6 +16,8 @@ public class World : MonoBehaviour
     public BlockType[] blockTypes;
     public BiomeAttributes biome;
     public GameObject debugScreen;
+    public GameObject creativeInventoryWindow;
+    public GameObject cursorSlot;
 
     public Vector3 spawnPosition;
     public ChunkCoord playerLastChunkCoord;
@@ -25,7 +28,6 @@ public class World : MonoBehaviour
     public List<Chunk> chunksToUpdate = new List<Chunk>();
     List<ChunkCoord> chunksToCreate = new List<ChunkCoord>();
     Queue<Queue<VoxelMod>> modifications = new Queue<Queue<VoxelMod>>();
-    Dictionary<string, ushort> blockNameToID;
     public Queue<Chunk> chunksToDraw = new Queue<Chunk>();
     public FaceUVs[,] faceUVCache;
 
@@ -67,9 +69,16 @@ public class World : MonoBehaviour
         }
     }
 
-    void BuildBlockNameLookup()
+    // BlockID member values are the blockTypes indices (the generator writes them
+    // explicitly), so a BlockID converts to an index with a plain cast. This only
+    // validates that the two are still in sync; it is not a lookup.
+    void ValidateBlockIDs()
     {
-        blockNameToID = new Dictionary<string, ushort>();
+        if (blockTypes.Length != System.Enum.GetValues(typeof(BlockID)).Length)
+        {
+            Debug.LogWarning("blockTypes and BlockID have different lengths. " +
+                             "Re-run Tools > Generate BlockID Enum.");
+        }
 
         for (ushort i = 0; i < blockTypes.Length; i++)
         {
@@ -81,28 +90,44 @@ public class World : MonoBehaviour
                 continue;
             }
 
-            if (!blockNameToID.TryAdd(name, i))
-                Debug.LogWarning($"Duplicate block name '{name}' at index {i} (already used by index {blockNameToID[name]}).");
+            if (!System.Enum.TryParse<BlockID>(name.Replace(' ', '_'), out BlockID id) || id != (BlockID)i)
+            {
+                Debug.LogWarning($"blockTypes[{i}] blockName '{name}' does not match BlockID.{id} = {(int)id}. " +
+                                 "Re-run Tools > Generate BlockID Enum.");
+            }
         }
     }
 
-    public ushort GetBlockIndex(string blockName)
+    public bool inUI
     {
-        if (blockNameToID.TryGetValue(blockName, out ushort index))
-            return index;
-
-        Debug.LogError($"Block name '{blockName}' not found in blockTypes.");
-        return 0; // falls back to Air
+        get { return _inUI; }
+        set
+        {
+            _inUI = value;
+            if (_inUI)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                creativeInventoryWindow.SetActive(true);
+                cursorSlot.SetActive(true);
+            }
+            else
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                creativeInventoryWindow.SetActive(false);
+                cursorSlot.SetActive(false);
+            }
+        }
     }
 
     private void Awake()
     {
-        BuildBlockNameLookup();
+        ValidateBlockIDs();
         BuildFaceUVCache();
     }
 
     private void Start()
     {
+        Cursor.lockState = CursorLockMode.Locked;
         Random.InitState(seed);
 
         int spawnX = VoxelData.WorldSizeInVoxels / 2;
@@ -112,7 +137,7 @@ public class World : MonoBehaviour
 
         for (int y = VoxelData.ChunkHeight - 1; y >= 0; y--)
         {
-            if (GetVoxel(new Vector3(spawnX, y, spawnZ)) != 0)
+            if (GetVoxel(new Vector3(spawnX, y, spawnZ)) != BlockID.Air)
             {
                 spawnY = y + 1;
                 break;
@@ -346,10 +371,10 @@ public class World : MonoBehaviour
 
         if (chunk != null && chunk.isEditable)
         {
-            return blockTypes[chunk.GetVoxelFromGlobalVector3(pos)];
+            return blockTypes[(int)chunk.GetVoxelFromGlobalVector3(pos)];
         }
 
-        return blockTypes[GetVoxel(pos)];
+        return blockTypes[(int)GetVoxel(pos)];
     }
 
     public bool CheckForVoxel(Vector3 pos)
@@ -376,7 +401,7 @@ public class World : MonoBehaviour
         return block.isTransparent;
     }
 
-    public ushort GetVoxel(Vector3 pos)
+    public BlockID GetVoxel(Vector3 pos)
     {
         int yPos = Mathf.FloorToInt(pos.y);
         // Immutable Pass
@@ -384,39 +409,39 @@ public class World : MonoBehaviour
         // if outside return air
         if (!IsVoxelInWorld(pos))
         {
-            return this.GetBlockIndex("Air");
+            return BlockID.Air;
         }
         // if at ground return bedrock
         if  (yPos == 0)
         {
-            return this.GetBlockIndex("Bedrock");
+            return BlockID.Bedrock;
         }
 
         // Basic Terrain Pass
         float noise = Noise.Get2DPerlin(new Vector2(pos.x, pos.z), 0, biome.terrainScale);
         int terrainHeight = Mathf.FloorToInt(noise * biome.terrainHeight) + biome.solidGroundHeight;
-        ushort voxelValue = 0;
+        BlockID voxelValue = BlockID.Air;
 
         if (yPos == terrainHeight)
         {
-            voxelValue = this.GetBlockIndex("Grass");
+            voxelValue = BlockID.Grass;
         }
         else if (yPos < terrainHeight && yPos > terrainHeight - 4)
         {
-            voxelValue = this.GetBlockIndex("Dirt");
+            voxelValue = BlockID.Dirt;
         }
         else if (yPos > terrainHeight)
         {
-            return this.GetBlockIndex("Air");
+            return BlockID.Air;
         }
         else
         {
-            voxelValue = this.GetBlockIndex("Stone");
+            voxelValue = BlockID.Stone;
         }
 
         // Second Pass
 
-        if (voxelValue == this.GetBlockIndex("Stone"))
+        if (voxelValue == BlockID.Stone)
         {
             // Check for lode generation
             foreach (Lode lode in biome.lodes)
@@ -426,7 +451,7 @@ public class World : MonoBehaviour
                     bool noise2 = Noise.Get3DPerlin(pos, lode.noiseOffset, lode.scale, lode.threshold);
                     if (noise2)
                     {
-                        voxelValue = this.GetBlockIndex(lode.blockName);
+                        voxelValue = lode.block;
                     }
                 }
             }
@@ -471,6 +496,7 @@ public class BlockType
     public string blockName;
     public bool isSolid;
     public bool isTransparent;
+    public int maxStackSize;
     public Sprite icon;
 
     [Header("Texture Values")]
@@ -497,12 +523,12 @@ public class BlockType
 public class VoxelMod
 {
     public Vector3 position;
-    public ushort id;
+    public BlockID id;
 
-    public VoxelMod(Vector3 position, string id, World world)
+    public VoxelMod(Vector3 position, BlockID id, World world)
     {
         this.position = position;
-        this.id = world.GetBlockIndex(id);
+        this.id = id;
     }
 }
 

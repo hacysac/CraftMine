@@ -1,12 +1,13 @@
+using System.Security.Cryptography;
 using UnityEngine;
 
 public class Player : MonoBehaviour
 {   
     public Transform camera;
     public World world;
-    public Toolbar toolbar;
     public Transform breakHighlight;
     public Transform placeHighlight;
+    public Toolbar toolbar;
 
     public bool isGrounded;
     public bool isSprinting;
@@ -22,7 +23,6 @@ public class Player : MonoBehaviour
 
     public float checkIncrement = 0.1f;
     public float reach = 8f;
-    public string selectedBlockType;
     
     private float horizontal;
     private float vertical;
@@ -38,31 +38,44 @@ public class Player : MonoBehaviour
     {
         camera = GameObject.Find("Main Camera").transform;
         world = GameObject.Find("World").GetComponent<World>();
-        selectedBlockType = toolbar.itemSlots[0].itemName;
+        //selectedBlockID = toolbar.slots[0].itemSlot.stack.id;
 
         Cursor.lockState = CursorLockMode.Locked;
     }
 
     private void FixedUpdate()
     {
-        CalculateVelocity();
-        if (jumpRequest)
+
+        if (!world.inUI)
         {
-            Jump();
+            CalculateVelocity();
+            if (jumpRequest)
+            {
+                Jump();
+            }
+            transform.Translate(velocity, Space.World);
         }
-        transform.Translate(velocity, Space.World);
     }
 
     private void Update()
     {
-        GetInput();
-        PlaceCursorBlocks();
 
-        transform.Rotate(Vector3.up * mouseX);
-        xRotation -= mouseY;
-        xRotation = Mathf.Clamp(xRotation, -90f, 90f);
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            world.inUI = !world.inUI;
+        }
 
-        camera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        if (!world.inUI)
+        {
+            GetInput();
+            PlaceCursorBlocks();
+
+            transform.Rotate(Vector3.up * mouseX);
+            xRotation -= mouseY;
+            xRotation = Mathf.Clamp(xRotation, -90f, 90f);
+
+            camera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        }
     }
 
     private void PlaceCursorBlocks()
@@ -148,7 +161,11 @@ public class Player : MonoBehaviour
 
         if (breakHighlight.gameObject.activeSelf && Input.GetMouseButtonDown(0))
         {
-            world.GetChunkFromVector3(breakHighlight.position).EditVoxel(breakHighlight.position, "Air");
+            Chunk breakChunk = world.GetChunkFromVector3(breakHighlight.position);
+            if (breakChunk != null)
+            {
+                breakChunk.EditVoxel(breakHighlight.position, BlockID.Air);
+            }
         }
         if (placeHighlight.gameObject.activeSelf && Input.GetMouseButtonDown(1))
         {
@@ -156,9 +173,11 @@ public class Player : MonoBehaviour
             bool onXZ = Mathf.FloorToInt(transform.position.x) == placeHighlight.position.x && Mathf.FloorToInt(transform.position.z) == placeHighlight.position.z;
             bool onY = Mathf.FloorToInt(transform.position.y) == placeHighlight.position.y || Mathf.FloorToInt(transform.position.y) + 1 == placeHighlight.position.y;
 
-            if (!(onXZ && onY))
+            Chunk placeChunk = world.GetChunkFromVector3(placeHighlight.position);
+            if (!(onXZ && onY) && placeChunk != null && toolbar.slots[toolbar.slotIndex].HasItem)
             {
-                world.GetChunkFromVector3(placeHighlight.position).EditVoxel(placeHighlight.position, selectedBlockType);
+                placeChunk.EditVoxel(placeHighlight.position, toolbar.slots[toolbar.slotIndex].itemSlot.stack.id);
+                toolbar.slots[toolbar.slotIndex].itemSlot.Take(1);
             }
         }
     }

@@ -1,55 +1,56 @@
+using System;
 using UnityEngine;
-using UnityEngine.UI;
-
+using System.Linq;
 public class Toolbar : MonoBehaviour
 {
-    World world;
-    public Player player;
+    public UIItemSlot[] slots;
     public RectTransform highlight;
-    public ItemSlot[] itemSlots;
+    public int slotIndex = 0;
 
-    int slotIndex = 0;
+    World world;
+    Player player;
 
     private void Start()
     {
         world = GameObject.Find("World").GetComponent<World>();
-        foreach (ItemSlot slot in itemSlots)
-        {   
+        player = GameObject.Find("Player").GetComponent<Player>();
+        // Every block except Air, straight from the auto-generated enum.
+        BlockID[] blockIDs = (BlockID[])Enum.GetValues(typeof(BlockID));
 
-            slot.icon.sprite = world.blockTypes[world.GetBlockIndex(slot.itemName)].icon;
-            slot.icon.enabled = true;
+        for (int i = 0; i < slots.Length; i++)
+        {
+            // Offset by 1 to skip Air at index 0.
+            BlockID blockID = blockIDs[(i+1) % blockIDs.Length];
+            ItemStack stack = new ItemStack(blockID, UnityEngine.Random.Range(2, 65));
+            ItemSlot slot = new ItemSlot(slots[i], stack);
         }
     }
-
-    private void Update()
+    
+    public void Update()
     {
         float scroll = Input.GetAxis("Mouse ScrollWheel");
+
         if (scroll != 0)
         {
-            if (scroll < 0)
+            if (scroll > 0)
             {
-                slotIndex++;
-                if (slotIndex > itemSlots.Length-1)
-                {
-                    slotIndex = 0;
-                }
+                slotIndex--;
             }
             else
             {
-                slotIndex--;
-                if (slotIndex < 0){
-                    slotIndex = itemSlots.Length - 1;
-                }
+                slotIndex++;
             }
-            highlight.position = itemSlots[slotIndex].icon.transform.position;
-            player.selectedBlockType = itemSlots[slotIndex].itemName;
         }
-    }
-}
 
-[System.Serializable]
-public class ItemSlot
-{
-    public string itemName;
-    public Image icon;
+        if (slotIndex >= slots.Length)
+        {
+            slotIndex = 0;
+        }
+        if (slotIndex < 0)
+        {
+            slotIndex = slots.Length - 1;
+        }
+
+        highlight.position = slots[slotIndex].slotIcon.transform.position;
+    }
 }
