@@ -1,6 +1,8 @@
+using System.Security.AccessControl;
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.U2D;
+using System.Threading;
 
 public class World : MonoBehaviour
 {
@@ -20,12 +22,15 @@ public class World : MonoBehaviour
 
     Chunk[,] chunks = new Chunk[VoxelData.WorldSizeInChunks, VoxelData.WorldSizeInChunks];
     List<ChunkCoord> activeChunks = new List<ChunkCoord>();
-    List<Chunk> chunksToUpdate = new List<Chunk>();
+    public List<Chunk> chunksToUpdate = new List<Chunk>();
     List<ChunkCoord> chunksToCreate = new List<ChunkCoord>();
     Queue<Queue<VoxelMod>> modifications = new Queue<Queue<VoxelMod>>();
     Dictionary<string, ushort> blockNameToID;
     public Queue<Chunk> chunksToDraw = new Queue<Chunk>();
     public FaceUVs[,] faceUVCache;
+
+    Thread ChunkUpdateThread;
+    public object ChunkUpdateThreadLock = new object();
 
     void BuildFaceUVCache()
     {
@@ -114,7 +119,10 @@ public class World : MonoBehaviour
             }
         }
 
-        spawnPosition = new Vector3(spawnX+0.5f, spawnY+2, spawnZ+0.5f);
+        spawnPosition = new Vector3(spawnX + 0.5f, spawnY + 2, spawnZ + 0.5f);
+        
+        ChunkUpdateThread = new Thread(new ThreadStart(ThreadedUpdate));
+        ChunkUpdateThread.Start();
 
         GenerateWorld();
 
@@ -137,17 +145,9 @@ public class World : MonoBehaviour
         {
             CheckViewDistance();
         }
-        if (!applyingModifications)
-        {
-            ApplyModifications();
-        }
         if (chunksToCreate.Count > 0)
         {
             CreateChunk();
-        }
-        if (chunksToUpdate.Count > 0)
-        {
-            UpdateChunks();
         }
         if (Input.GetKeyDown(KeyCode.F3))
         {
@@ -155,12 +155,9 @@ public class World : MonoBehaviour
         }
         if (chunksToDraw.Count > 0)
         {
-            lock (chunksToDraw)
+            if (chunksToDraw.Peek().isEditable)
             {
-                if (chunksToDraw.Peek().isEditable)
-                {
-                    chunksToDraw.Dequeue().CreateMesh();
-                }
+                chunksToDraw.Dequeue().CreateMesh();
             }
         }
     }
@@ -169,38 +166,66 @@ public class World : MonoBehaviour
     {
         for (int x = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; x < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; x++)
         {
-                for (int z = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; z < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; z++)
-                {
-                    ChunkCoord thisChunk = new ChunkCoord(x,z);
-                    chunks[x,z] = new Chunk(thisChunk, this, true);
-                    activeChunks.Add(thisChunk);
-                }
+            for (int z = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; z < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; z++)
+            {
+                ChunkCoord thisChunk = new ChunkCoord(x,z);
+                chunks[x, z] = new Chunk(thisChunk, this);
+                chunksToCreate.Add(thisChunk);
+            }
         }
 
         player.position = spawnPosition;
+        CheckViewDistance();
     }
 
     void CreateChunk()
     {
         ChunkCoord c = chunksToCreate[0];
         chunksToCreate.RemoveAt(0);
-        activeChunks.Add(c);
         chunks[c.x,c.z].Init();
     }
     void UpdateChunks()
     {
         bool updated = false;
         int index = 0;
-        while (!updated && index < chunksToUpdate.Count-1)
+        lock (ChunkUpdateThreadLock)
         {
-            if (chunksToUpdate[index].isEditable)
+            while (!updated && index < chunksToUpdate.Count)
             {
-                chunksToUpdate[index].UpdateChunk();
-                chunksToUpdate.RemoveAt(index);
-                updated = true;
+                if (chunksToUpdate[index].isEditable)
+                {
+                    chunksToUpdate[index].UpdateChunk();
+
+                    // Registers chunks created outside CheckViewDistance (e.g. tree
+                    // spillover in ApplyModifications) so they can be deactivated later.
+                    activeChunks.Add(chunksToUpdate[index].chunkCoord);
+
+                    chunksToUpdate.RemoveAt(index);
+                    updated = true;
+                }
+                index++;
             }
-            index++;
         }
+    }
+
+    void ThreadedUpdate()
+    {
+        while (true)
+        {
+            if (!applyingModifications)
+            {
+                ApplyModifications();
+            }
+            if (chunksToUpdate.Count > 0)
+            {
+                UpdateChunks();
+            }
+        }
+    }
+    
+    private void OnDisable()
+    {
+        ChunkUpdateThread.Abort();
     }
 
     void ApplyModifications()
@@ -208,11 +233,14 @@ public class World : MonoBehaviour
         applyingModifications = true;
         while (modifications.Count > 0)
         {
-            Queue<VoxelMod> queue = modifications.Dequeue();
+            Queue<VoxelMod> queue;
+
             lock (modifications)
             {
                 if (modifications.Count == 0)
+                {
                     break;
+                }
                 queue = modifications.Dequeue();
             }
 
@@ -222,16 +250,25 @@ public class World : MonoBehaviour
                 ChunkCoord c = GetChunkCoordFromVector3(v.position);
                 if (chunks[c.x,c.z] == null)
                 {
-                    chunks[c.x,c.z] = new Chunk(c, this, true);
-                    activeChunks.Add(c);
+                    chunks[c.x, c.z] = new Chunk(c, this);
+                    chunksToCreate.Add(c);
                 }
-                lock (chunks[c.x, c.z].modifications)
+                Chunk chunk = chunks[c.x, c.z];
+
+                lock (chunk.modifications)
                 {
-                    chunks[c.x, c.z].modifications.Enqueue(v);
+                    chunk.modifications.Enqueue(v);
                 }
-                if (!chunksToUpdate.Contains(chunks[c.x, c.z]))
+
+                if (chunk.isEditable)
                 {
-                    chunksToUpdate.Add(chunks[c.x, c.z]);
+                    lock (ChunkUpdateThreadLock)
+                    {
+                        if (!chunksToUpdate.Contains(chunk))
+                        {
+                            chunksToUpdate.Add(chunk);
+                        }
+                    }
                 }
             }
         }
@@ -256,6 +293,8 @@ public class World : MonoBehaviour
         List<ChunkCoord> previouslyActiveChunks = new List<ChunkCoord>(activeChunks);
         ChunkCoord playerChunkCoord = GetChunkCoordFromVector3(player.position);
         playerLastChunkCoord = playerChunkCoord;
+
+        activeChunks.Clear();
         for (int x = playerChunkCoord.x - VoxelData.ViewDistanceInChunks; x < playerChunkCoord.x + VoxelData.ViewDistanceInChunks; x++)
         {
             for (int z = playerChunkCoord.z - VoxelData.ViewDistanceInChunks; z < playerChunkCoord.z + VoxelData.ViewDistanceInChunks; z++)
@@ -266,7 +305,7 @@ public class World : MonoBehaviour
 
                     if (chunks[x, z] == null)
                     {
-                        chunks[x,z] = new Chunk(thisChunk, this, false);
+                        chunks[x,z] = new Chunk(thisChunk, this);
                         chunksToCreate.Add(thisChunk);
                     }
                     else if (!chunks[x, z].isActive)
@@ -275,18 +314,21 @@ public class World : MonoBehaviour
                     }
                     activeChunks.Add(thisChunk);
                 }
-                for (int i = 0; i < previouslyActiveChunks.Count; i++) {
-
+                // Backwards, so RemoveAt cannot skip the element that shifts into i.
+                for (int i = previouslyActiveChunks.Count - 1; i >= 0; i--)
+                {
                     if (previouslyActiveChunks[i].x == x && previouslyActiveChunks[i].z == z)
+                    {
                         previouslyActiveChunks.RemoveAt(i);
-
+                    }
                 }
             }
         }
+
+        // Whatever is left is out of view now.
         foreach (ChunkCoord chunk in previouslyActiveChunks)
         {
             chunks[chunk.x, chunk.z].isActive = false;
-            activeChunks.Remove(chunk);
         }
     }
 

@@ -163,11 +163,23 @@ public class Player : MonoBehaviour
         }
     }
 
-    // True if any of the player's four bottom corners overlaps a solid voxel at the
-    // given world height, ignoring corners we are already pressed against sideways.
+    // True if the player overlaps a solid voxel at the given world height.
+    //
+    // The corner probes are suppressed when we are already pressed against a wall on
+    // that side, otherwise the wall itself reads as ground and the player can climb it.
+    // But if two opposing sides are blocked (l && r, or f && b) every corner term is
+    // suppressed at once, which would leave no vertical check at all - so the centre
+    // column is always probed unguarded. A wall can never occupy the player's own
+    // centre column, so it cannot cause false grounding.
     private bool BlockedAtHeight(float y)
     {
         Vector3 p = transform.position;
+
+        if (world.CheckForVoxel(new Vector3(p.x, y, p.z)))
+        {
+            return true;
+        }
+
         bool l = left, r = right, f = front, b = back;
 
         return (!l && !f && world.CheckForVoxel(new Vector3(p.x - playerWidth, y, p.z + playerWidth)))

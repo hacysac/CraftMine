@@ -23,19 +23,12 @@ public class Chunk
     public Queue<VoxelMod> modifications = new Queue<VoxelMod>();
 
     private bool _isActive;
-    private bool isThreadLocked;
     private bool isVoxelMapPopulated = false;
 
-    public Chunk(ChunkCoord chunkCoord, World world, bool generateOnLoad)
+    public Chunk(ChunkCoord chunkCoord, World world)
     {
         this.chunkCoord = chunkCoord;
         this.world = world;
-        isActive = true;
-
-        if (generateOnLoad)
-        {
-            Init();
-        }
     }
 
     public void Init()
@@ -51,10 +44,9 @@ public class Chunk
         chunkObject.transform.position = new Vector3(chunkCoord.x * VoxelData.ChunkWidth, 0, chunkCoord.z * VoxelData.ChunkWidth);
 
         position = chunkObject.transform.position;   // now correctly reflects the chunk's actual world position
-        chunkObject.name += " " + (position.x/VoxelData.ChunkWidth) + "," + (position.z/VoxelData.ChunkWidth); 
+        chunkObject.name += " " + (position.x/VoxelData.ChunkWidth) + "," + (position.z/VoxelData.ChunkWidth);
 
-        Thread thread = new Thread(new ThreadStart(PopulateVoxelMap));
-        thread.Start();
+        PopulateVoxelMap();
     }
 
     void PopulateVoxelMap()
@@ -69,8 +61,11 @@ public class Chunk
                 }
             }
         }
-        _updateChunk();
         isVoxelMapPopulated = true;
+        lock (world.ChunkUpdateThreadLock)
+        {
+            world.chunksToUpdate.Add(this);
+        }
     }
 
     // voxelPos is chunk-local (0..ChunkWidth-1), not a world position.
@@ -106,13 +101,6 @@ public class Chunk
 
     public void UpdateChunk()
     {
-       Thread thread = new Thread(new ThreadStart(_updateChunk));
-       thread.Start();
-    }
-
-    private void _updateChunk()
-    {
-        isThreadLocked = true;
 
         lock (modifications)
         {
@@ -138,12 +126,7 @@ public class Chunk
                 }
             }
         }
-        lock (world.chunksToDraw)
-        {
-            world.chunksToDraw.Enqueue(this);
-        }
-
-        isThreadLocked = false;
+        world.chunksToDraw.Enqueue(this);
     }
 
     void ClearMeshData()
@@ -172,7 +155,7 @@ public class Chunk
     {
         get
         {
-            if(!isVoxelMapPopulated || isThreadLocked)
+            if(!isVoxelMapPopulated)
             {
                 return false;
             }
@@ -202,9 +185,11 @@ public class Chunk
 
         voxelMap[xCheck, yCheck, zCheck] = world.GetBlockIndex(newBlock);
 
-        UpdateSurroundingVoxels(xCheck, yCheck, zCheck);
-
-        _updateChunk();
+        lock (world.ChunkUpdateThreadLock)
+        {
+            world.chunksToUpdate.Insert(0,this);
+            UpdateSurroundingVoxels(xCheck, yCheck, zCheck);
+        }
     }
 
     void UpdateSurroundingVoxels(int x, int y, int z)
@@ -215,7 +200,7 @@ public class Chunk
             Vector3 currentVoxel = thisVoxel + VoxelData.faceChecks[j];
             if (!IsVoxelInChunk((int) currentVoxel.x, (int) currentVoxel.y, (int)currentVoxel.z))
             {
-                world.GetChunkFromVector3(currentVoxel+position).UpdateChunk();
+                world.chunksToUpdate.Insert(0,world.GetChunkFromVector3(currentVoxel + position));
             }
         }
     }
@@ -273,7 +258,7 @@ public class Chunk
 
 }
 
-public class ChunkCoord
+public class ChunkCoord : System.IEquatable<ChunkCoord>
 {
     public int x;
     public int z;
@@ -300,6 +285,19 @@ public class ChunkCoord
 
     public bool Equals(ChunkCoord other)
     {
-        return x == other.x && z == other.z;
+        return other != null && x == other.x && z == other.z;
+    }
+
+    // Needed so List.Contains/Remove compare by value. Without these overrides
+    // EqualityComparer<ChunkCoord>.Default falls back to reference equality, because
+    // the typed Equals above overloads rather than overrides object.Equals.
+    public override bool Equals(object obj)
+    {
+        return Equals(obj as ChunkCoord);
+    }
+
+    public override int GetHashCode()
+    {
+        return (x * 397) ^ z;
     }
 }
