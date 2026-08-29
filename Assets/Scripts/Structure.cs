@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using System.Collections;
 public static class Structure
 {
     public static Queue<VoxelMod> MakeTree (Vector3 position, int minTrunkHeight, int maxTrunkHeight, World world)
@@ -11,6 +10,8 @@ public static class Structure
         {
             height = minTrunkHeight;
         }
+        // Canopy from the top down: a 5-block plus, a 3x3 layer, then two 5x5 layers.
+        // The trunk is enqueued last so its logs overwrite the leaves in the centre column.
         for (int x = -2; x < 3; x++)
         {
             for (int z = -2; z < 3; z++)

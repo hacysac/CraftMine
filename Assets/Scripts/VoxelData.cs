@@ -34,8 +34,6 @@ public static class VoxelData
     };
 
     public static readonly int[,] voxelTris = new int[6, 4]
-
-
     {
         {0, 3, 1, 2}, // Back Face
         {5, 6, 4, 7}, // Front Face
@@ -43,14 +41,6 @@ public static class VoxelData
         {1, 5, 0, 4}, // Bottom Face
         {4, 7, 0, 3}, // Left Face
         {1, 2, 5, 6} // Right Face
-    };
-
-    public static readonly Vector2[] voxelUvs = new Vector2[4]
-    {
-        new Vector2(0.0f, 0.0f), // Bottom Left
-        new Vector2(0.0f, 1.0f),  // Top Left
-        new Vector2(1.0f, 0.0f),  // Bottom Right
-        new Vector2(1.0f, 1.0f), // Top Right
     };
 }
 

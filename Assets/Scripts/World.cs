@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using System.Collections;
 using UnityEngine.U2D;
 
 public class World : MonoBehaviour
@@ -36,16 +35,10 @@ public class World : MonoBehaviour
         {
             for (int f = 0; f < 6; f++)
             {
-                Sprite sprite = blockTypes[b].GetTextureID(f);
+                Sprite sprite = blockTypes[b].GetFaceSprite(f);
                 if (sprite == null)
                 {
-                    faceUVCache[b, f] = new FaceUVs
-                    {
-                        uv00 = Vector2.zero,
-                        uv01 = Vector2.zero,
-                        uv10 = Vector2.zero,
-                        uv11 = Vector2.zero
-                    };
+                    // Leave as default(FaceUVs), which is already all zeroes.
                     continue;
                 }
 
@@ -98,7 +91,7 @@ public class World : MonoBehaviour
     }
 
     private void Awake()
-{
+    {
         BuildBlockNameLookup();
         BuildFaceUVCache();
     }
@@ -126,7 +119,7 @@ public class World : MonoBehaviour
         GenerateWorld();
 
         if (blockAtlas != null)
-{
+        {
             Sprite firstSprite = blockAtlas.GetSprite("grass_top");
 
             if (firstSprite != null)
@@ -252,11 +245,10 @@ public class World : MonoBehaviour
         return new ChunkCoord(x, z);
     }
 
-    public Chunk getChunkFromVector3(Vector3 pos)
+    public Chunk GetChunkFromVector3(Vector3 pos)
     {
-        int x = Mathf.FloorToInt(pos.x / VoxelData.ChunkWidth);
-        int z = Mathf.FloorToInt(pos.z / VoxelData.ChunkWidth);
-        return chunks[x,z];
+        ChunkCoord coord = GetChunkCoordFromVector3(pos);
+        return chunks[coord.x, coord.z];
     }
 
     void CheckViewDistance()
@@ -269,7 +261,7 @@ public class World : MonoBehaviour
             for (int z = playerChunkCoord.z - VoxelData.ViewDistanceInChunks; z < playerChunkCoord.z + VoxelData.ViewDistanceInChunks; z++)
             {
                 ChunkCoord thisChunk = new ChunkCoord(x, z);
-                if (isChunkInWorld(thisChunk))
+                if (IsChunkInWorld(thisChunk))
                 {
 
                     if (chunks[x, z] == null)
@@ -298,34 +290,48 @@ public class World : MonoBehaviour
         }
     }
 
+    // Resolves the block at a world position, preferring the live chunk data when it is
+    // ready and falling back to procedural generation otherwise. Null when out of world.
+    BlockType BlockTypeAt(Vector3 pos)
+    {
+        if (!IsVoxelInWorld(pos))
+        {
+            return null;
+        }
+
+        ChunkCoord coord = new ChunkCoord(pos);
+        Chunk chunk = chunks[coord.x, coord.z];
+
+        if (chunk != null && chunk.isEditable)
+        {
+            return blockTypes[chunk.GetVoxelFromGlobalVector3(pos)];
+        }
+
+        return blockTypes[GetVoxel(pos)];
+    }
+
     public bool CheckForVoxel(Vector3 pos)
     {
-        ChunkCoord thisChunk = new ChunkCoord(pos);
+        BlockType block = BlockTypeAt(pos);
 
-        if (!isVoxelInWorld(pos))
+        if (block == null)
         {
             return false;
         }
-        if (chunks[thisChunk.x, thisChunk.z] != null && chunks[thisChunk.x, thisChunk.z].isEditable)
-        {
-            return this.blockTypes[chunks[thisChunk.x, thisChunk.z].GetVoxelFromGlobalVector3(pos)].isSolid;
-        }
-        return this.blockTypes[GetVoxel(pos)].isSolid;
+
+        return block.isSolid;
     }
 
     public bool CheckIfVoxelTransparent(Vector3 pos)
     {
-        ChunkCoord thisChunk = new ChunkCoord(pos);
+        BlockType block = BlockTypeAt(pos);
 
-        if (!isVoxelInWorld(pos))
+        if (block == null)
         {
             return false;
         }
-        if (chunks[thisChunk.x, thisChunk.z] != null && chunks[thisChunk.x, thisChunk.z].isEditable)
-        {
-            return this.blockTypes[chunks[thisChunk.x, thisChunk.z].GetVoxelFromGlobalVector3(pos)].isTransparent;
-        }
-        return this.blockTypes[GetVoxel(pos)].isTransparent;
+
+        return block.isTransparent;
     }
 
     public ushort GetVoxel(Vector3 pos)
@@ -334,7 +340,7 @@ public class World : MonoBehaviour
         // Immutable Pass
 
         // if outside return air
-        if (!isVoxelInWorld(pos))
+        if (!IsVoxelInWorld(pos))
         {
             return this.GetBlockIndex("Air");
         }
@@ -351,19 +357,19 @@ public class World : MonoBehaviour
 
         if (yPos == terrainHeight)
         {
-            voxelValue = this.GetBlockIndex("Grass");;
+            voxelValue = this.GetBlockIndex("Grass");
         }
         else if (yPos < terrainHeight && yPos > terrainHeight - 4)
         {
-            voxelValue = this.GetBlockIndex("Dirt");;
+            voxelValue = this.GetBlockIndex("Dirt");
         }
         else if (yPos > terrainHeight)
         {
-            return this.GetBlockIndex("Air");;
+            return this.GetBlockIndex("Air");
         }
         else
         {
-            voxelValue = this.GetBlockIndex("Stone");;
+            voxelValue = this.GetBlockIndex("Stone");
         }
 
         // Second Pass
@@ -403,22 +409,17 @@ public class World : MonoBehaviour
         return voxelValue;
     }
 
-    bool isChunkInWorld(ChunkCoord chunkCoord)
+    bool IsChunkInWorld(ChunkCoord chunkCoord)
     {
-        if (chunkCoord.x < 0 || chunkCoord.x >= VoxelData.WorldSizeInChunks || chunkCoord.z < 0 || chunkCoord.z >= VoxelData.WorldSizeInChunks)
-        {
-            return false;
-        }
-        return true;
+        return chunkCoord.x >= 0 && chunkCoord.x < VoxelData.WorldSizeInChunks
+            && chunkCoord.z >= 0 && chunkCoord.z < VoxelData.WorldSizeInChunks;
     }
 
-    bool isVoxelInWorld(Vector3 pos)
+    bool IsVoxelInWorld(Vector3 pos)
     {
-        if (pos.x < 0 || pos.x >= VoxelData.WorldSizeInVoxels || pos.y < 0 || pos.y >= VoxelData.ChunkHeight || pos.z < 0 || pos.z >= VoxelData.WorldSizeInVoxels)
-        {
-            return false;
-        }
-        return true;
+        return pos.x >= 0 && pos.x < VoxelData.WorldSizeInVoxels
+            && pos.y >= 0 && pos.y < VoxelData.ChunkHeight
+            && pos.z >= 0 && pos.z < VoxelData.WorldSizeInVoxels;
     }
 }
 
@@ -438,44 +439,26 @@ public class BlockType
     public Sprite leftFaceTexture;
     public Sprite rightFaceTexture;
 
-    public Sprite GetTextureID(int faceIndex)
+    // Face indices match VoxelData.faceChecks.
+    public Sprite GetFaceSprite(int faceIndex) => faceIndex switch
     {
-        switch (faceIndex)
-        {
-            case 0: // Back Face
-                return backFaceTexture;
-            case 1: // Front Face
-                return frontFaceTexture;
-            case 2: // Top Face
-                return topFaceTexture;
-            case 3: // Bottom Face
-                return bottomFaceTexture;
-            case 4: // Left Face
-                return leftFaceTexture;
-            case 5: // Right Face
-                return rightFaceTexture;
-            default:
-                Debug.Log("Error in GetTextureID. Invalid face index.");
-                return null;
-        }
-    }
+        0 => backFaceTexture,
+        1 => frontFaceTexture,
+        2 => topFaceTexture,
+        3 => bottomFaceTexture,
+        4 => leftFaceTexture,
+        5 => rightFaceTexture,
+        _ => null,
+    };
 }
 
 public class VoxelMod
 {
-    World world;
     public Vector3 position;
     public ushort id;
 
-    public VoxelMod(World world)
-    {
-        this.world = world;
-        this.position = new Vector3();
-        this.id = 0;
-    }
     public VoxelMod(Vector3 position, string id, World world)
     {
-        this.world = world;
         this.position = position;
         this.id = world.GetBlockIndex(id);
     }

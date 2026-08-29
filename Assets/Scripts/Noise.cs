@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class Noise
+public static class Noise
 {
 
     public static float Get2DPerlin(Vector2 position, float offset, float scale)

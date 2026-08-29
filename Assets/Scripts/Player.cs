@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.UI;
 
 public class Player : MonoBehaviour
 {   
@@ -57,7 +56,7 @@ public class Player : MonoBehaviour
     private void Update()
     {
         GetInput();
-        placeCursorBlocks();
+        PlaceCursorBlocks();
 
         transform.Rotate(Vector3.up * mouseX);
         xRotation -= mouseY;
@@ -66,7 +65,7 @@ public class Player : MonoBehaviour
         camera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
     }
 
-    private void placeCursorBlocks()
+    private void PlaceCursorBlocks()
     {
         float step = checkIncrement;
         Vector3 lastPos = new Vector3();
@@ -93,7 +92,7 @@ public class Player : MonoBehaviour
     private void CalculateVelocity()
     {
         // velocity.y += gravity * Time.deltaTime;
-        // velocity.y = checkDownSpeed(velocity.y);
+        // velocity.y = CheckDownSpeed(velocity.y);
         if (verticalMomentum > gravity)
         {
             verticalMomentum += Time.fixedDeltaTime * gravity;
@@ -111,11 +110,11 @@ public class Player : MonoBehaviour
         }
         if (velocity.y < 0)
         {
-            velocity.y = checkDownSpeed(velocity.y);
+            velocity.y = CheckDownSpeed(velocity.y);
         }
         else if(velocity.y > 0)
         {
-            velocity.y = checkUpSpeed(velocity.y);
+            velocity.y = CheckUpSpeed(velocity.y);
         }
 
     }
@@ -149,92 +148,61 @@ public class Player : MonoBehaviour
 
         if (breakHighlight.gameObject.activeSelf && Input.GetMouseButtonDown(0))
         {
-            world.getChunkFromVector3(breakHighlight.position).EditVoxel(breakHighlight.position, "Air");
+            world.GetChunkFromVector3(breakHighlight.position).EditVoxel(breakHighlight.position, "Air");
         }
-        bool onXZ = Mathf.FloorToInt(transform.position.x) == placeHighlight.position.x && Mathf.FloorToInt(transform.position.z) == placeHighlight.position.z;
-        bool onY = Mathf.FloorToInt(transform.position.y) == placeHighlight.position.y || Mathf.FloorToInt(transform.position.y) + 1 == placeHighlight.position.y;
-        if (placeHighlight.gameObject.activeSelf && Input.GetMouseButtonDown(1) && !(onXZ && onY))
+        if (placeHighlight.gameObject.activeSelf && Input.GetMouseButtonDown(1))
         {
-            world.getChunkFromVector3(placeHighlight.position).EditVoxel(placeHighlight.position, selectedBlockType);
+            // Don't let the player place a block inside their own body.
+            bool onXZ = Mathf.FloorToInt(transform.position.x) == placeHighlight.position.x && Mathf.FloorToInt(transform.position.z) == placeHighlight.position.z;
+            bool onY = Mathf.FloorToInt(transform.position.y) == placeHighlight.position.y || Mathf.FloorToInt(transform.position.y) + 1 == placeHighlight.position.y;
+
+            if (!(onXZ && onY))
+            {
+                world.GetChunkFromVector3(placeHighlight.position).EditVoxel(placeHighlight.position, selectedBlockType);
+            }
         }
     }
 
-    private float checkDownSpeed(float downSpeed)
+    // True if any of the player's four bottom corners overlaps a solid voxel at the
+    // given world height, ignoring corners we are already pressed against sideways.
+    private bool BlockedAtHeight(float y)
     {
-        bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + downSpeed, transform.position.z + playerWidth)) && !left && !front;
-        bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + downSpeed, transform.position.z - playerWidth)) && !left && !back;
-        bool corner3Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + downSpeed, transform.position.z + playerWidth)) && !right && !front;
-        bool corner4Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + downSpeed, transform.position.z - playerWidth)) && !right && !back;
-        
-        if (corner1Check || corner2Check || corner3Check || corner4Check)
-        {
-            isGrounded = true;
-            return 0f;
-        }
-        else
-        {
-            isGrounded = false;
-            return downSpeed;
-        }
+        Vector3 p = transform.position;
+        bool l = left, r = right, f = front, b = back;
+
+        return (!l && !f && world.CheckForVoxel(new Vector3(p.x - playerWidth, y, p.z + playerWidth)))
+            || (!l && !b && world.CheckForVoxel(new Vector3(p.x - playerWidth, y, p.z - playerWidth)))
+            || (!r && !f && world.CheckForVoxel(new Vector3(p.x + playerWidth, y, p.z + playerWidth)))
+            || (!r && !b && world.CheckForVoxel(new Vector3(p.x + playerWidth, y, p.z - playerWidth)));
     }
 
-    
-    private float checkUpSpeed(float upSpeed)
+    private float CheckDownSpeed(float downSpeed)
     {
-        bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z + playerWidth)) && !left && !front;
-        bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z - playerWidth)) && !left && !back;
-        bool corner3Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z + playerWidth)) && !front && !right;
-        bool corner4Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + upSpeed + playerHeight + bounceTolerance, transform.position.z - playerWidth)) && !back && !right;
-        
-        if (corner1Check || corner2Check || corner3Check || corner4Check)
-        {
-            verticalMomentum = 0;
-            return 0f;
-        }
-        else
+        isGrounded = BlockedAtHeight(transform.position.y + downSpeed);
+        return isGrounded ? 0f : downSpeed;
+    }
+
+
+    private float CheckUpSpeed(float upSpeed)
+    {
+        if (!BlockedAtHeight(transform.position.y + upSpeed + playerHeight + bounceTolerance))
         {
             return upSpeed;
         }
+
+        verticalMomentum = 0;
+        return 0f;
     }
 
-    public bool front
+    // True if a solid voxel sits against the player at either body height in the given direction.
+    private bool BlockedTowards(Vector3 offset)
     {
-        get
-        {
-            bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x, transform.position.y, transform.position.z + playerWidth));
-            bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x, transform.position.y + 1f, transform.position.z + playerWidth));
-            
-            return corner1Check || corner2Check;
-        }
+        Vector3 p = transform.position + offset;
+        return world.CheckForVoxel(p) || world.CheckForVoxel(p + Vector3.up);
     }
-    public bool back
-    {
-        get
-        {
-            bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x, transform.position.y, transform.position.z - playerWidth));
-            bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x, transform.position.y + 1f, transform.position.z - playerWidth));
-            
-            return corner1Check || corner2Check;
-        }
-    }
-    public bool left
-    {
-        get
-        {
-            bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y, transform.position.z));
-            bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x - playerWidth, transform.position.y + 1f, transform.position.z));
-            
-            return corner1Check || corner2Check;
-        }
-    }
-    public bool right
-    {
-        get
-        {
-            bool corner1Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y, transform.position.z));
-            bool corner2Check = world.CheckForVoxel(new Vector3(transform.position.x + playerWidth, transform.position.y + 1f, transform.position.z));
-            
-            return corner1Check || corner2Check;
-        }
-    }
+
+    public bool front => BlockedTowards(new Vector3(0f, 0f,  playerWidth));
+    public bool back  => BlockedTowards(new Vector3(0f, 0f, -playerWidth));
+    public bool left  => BlockedTowards(new Vector3(-playerWidth, 0f, 0f));
+    public bool right => BlockedTowards(new Vector3( playerWidth, 0f, 0f));
 }

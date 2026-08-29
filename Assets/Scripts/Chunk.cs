@@ -17,7 +17,6 @@ public class Chunk
     List<Vector3> vertices = new List<Vector3>();
     List<int> triangles = new List<int>();
     List<int> transparentTriangles = new List<int>();
-    Material[] materials = new Material[2];
     List<Vector2> uvs = new List<Vector2>();
 
     public ushort [,,] voxelMap = new ushort[VoxelData.ChunkWidth, VoxelData.ChunkHeight, VoxelData.ChunkWidth];
@@ -46,9 +45,7 @@ public class Chunk
         meshFilter = chunkObject.AddComponent<MeshFilter>();
         meshRenderer = chunkObject.AddComponent<MeshRenderer>();
 
-        materials[0] = world.material;
-        materials[1] = world.transparentMaterial;
-        meshRenderer.materials = materials;
+        meshRenderer.materials = new Material[] { world.material, world.transparentMaterial };
 
         chunkObject.transform.SetParent(world.transform);
         chunkObject.transform.position = new Vector3(chunkCoord.x * VoxelData.ChunkWidth, 0, chunkCoord.z * VoxelData.ChunkWidth);
@@ -76,43 +73,34 @@ public class Chunk
         isVoxelMapPopulated = true;
     }
 
-    void AddVoxelDataToChunk(Vector3 position)
+    // voxelPos is chunk-local (0..ChunkWidth-1), not a world position.
+    void AddVoxelDataToChunk(Vector3 voxelPos)
     {
+        ushort blockID = voxelMap[(int)voxelPos.x, (int)voxelPos.y, (int)voxelPos.z];
+        List<int> faceTriangles = world.blockTypes[blockID].isTransparent ? transparentTriangles : triangles;
+
         for (int j = 0; j < 6; j++)
         {
-            ushort blockID = voxelMap[(int)position.x, (int)position.y, (int)position.z];
-            bool isTransparent = world.blockTypes[blockID].isTransparent;
-
-            if(checkVoxel(position + VoxelData.faceChecks[j]))
+            if (!CheckVoxel(voxelPos + VoxelData.faceChecks[j]))
             {
-                vertices.Add(VoxelData.voxelVerts[VoxelData.voxelTris[j, 0]] + position);
-                vertices.Add(VoxelData.voxelVerts[VoxelData.voxelTris[j, 1]] + position);
-                vertices.Add(VoxelData.voxelVerts[VoxelData.voxelTris[j, 2]] + position);
-                vertices.Add(VoxelData.voxelVerts[VoxelData.voxelTris[j, 3]] + position);
-                
-                AddTexture(blockID, j);
+                continue;
+            }
 
-                if (!isTransparent)
-                {
-                    triangles.Add(vertexIndex);
-                    triangles.Add(vertexIndex + 1);
-                    triangles.Add(vertexIndex + 2);
-                    triangles.Add(vertexIndex + 2);
-                    triangles.Add(vertexIndex + 1);
-                    triangles.Add(vertexIndex + 3);
-                }
-                else
-                {
-                    transparentTriangles.Add(vertexIndex);
-                    transparentTriangles.Add(vertexIndex + 1);
-                    transparentTriangles.Add(vertexIndex + 2);
-                    transparentTriangles.Add(vertexIndex + 2);
-                    transparentTriangles.Add(vertexIndex + 1);
-                    transparentTriangles.Add(vertexIndex + 3);
-                }
-                vertexIndex += 4;
-                    
-            }            
+            for (int v = 0; v < 4; v++)
+            {
+                vertices.Add(VoxelData.voxelVerts[VoxelData.voxelTris[j, v]] + voxelPos);
+            }
+
+            AddTexture(blockID, j);
+
+            faceTriangles.Add(vertexIndex);
+            faceTriangles.Add(vertexIndex + 1);
+            faceTriangles.Add(vertexIndex + 2);
+            faceTriangles.Add(vertexIndex + 2);
+            faceTriangles.Add(vertexIndex + 1);
+            faceTriangles.Add(vertexIndex + 3);
+
+            vertexIndex += 4;
         }
     }
 
@@ -131,7 +119,7 @@ public class Chunk
             while (modifications.Count > 0)
             {
                 VoxelMod v = modifications.Dequeue();
-                Vector3 pos = v.position -= position;
+                Vector3 pos = v.position - position;
                 voxelMap[(int)pos.x, (int)pos.y, (int)pos.z] = v.id;
             }
         }
@@ -192,7 +180,7 @@ public class Chunk
         }
     }
 
-    bool isVoxelInChunk(int x, int y, int z)
+    bool IsVoxelInChunk(int x, int y, int z)
     {
         if (x < 0 || x >= VoxelData.ChunkWidth || y < 0 || y >= VoxelData.ChunkHeight || z < 0 || z >= VoxelData.ChunkWidth)
         {
@@ -207,7 +195,7 @@ public class Chunk
         int yCheck = Mathf.FloorToInt(pos.y);
         int zCheck = Mathf.FloorToInt(pos.z - position.z);
 
-        if (!isVoxelInChunk(xCheck, yCheck, zCheck) || voxelMap[xCheck, yCheck, zCheck] == world.GetBlockIndex("Bedrock"))
+        if (!IsVoxelInChunk(xCheck, yCheck, zCheck) || voxelMap[xCheck, yCheck, zCheck] == world.GetBlockIndex("Bedrock"))
         {
             return;
         }
@@ -225,9 +213,9 @@ public class Chunk
         for (int j = 0; j < 6; j++)
         {
             Vector3 currentVoxel = thisVoxel + VoxelData.faceChecks[j];
-            if (!isVoxelInChunk((int) currentVoxel.x, (int) currentVoxel.y, (int)currentVoxel.z))
+            if (!IsVoxelInChunk((int) currentVoxel.x, (int) currentVoxel.y, (int)currentVoxel.z))
             {
-                world.getChunkFromVector3(currentVoxel+position).UpdateChunk();
+                world.GetChunkFromVector3(currentVoxel+position).UpdateChunk();
             }
         }
     }
@@ -238,7 +226,7 @@ public class Chunk
         int yCheck = Mathf.FloorToInt(pos.y);
         int zCheck = Mathf.FloorToInt(pos.z - position.z);
 
-        if (!isVoxelInChunk(xCheck, yCheck, zCheck))
+        if (!IsVoxelInChunk(xCheck, yCheck, zCheck))
         {
             return 0;
         }
@@ -246,13 +234,13 @@ public class Chunk
         return voxelMap[xCheck, yCheck, zCheck];
     }
 
-    bool checkVoxel(Vector3 pos)
+    bool CheckVoxel(Vector3 pos)
     {
         int x = Mathf.FloorToInt(pos.x);
         int y = Mathf.FloorToInt(pos.y);
         int z = Mathf.FloorToInt(pos.z);
 
-        if (!isVoxelInChunk(x, y, z))
+        if (!IsVoxelInChunk(x, y, z))
         {
             return world.CheckIfVoxelTransparent(pos + position);
         }

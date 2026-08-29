@@ -25,12 +25,15 @@ public class DebugScreen : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        string debugText = "CraftMine Debug Screen\n";
-        debugText += frameRate + "fps\n\n";
-        debugText += "XYZ: " + (Mathf.FloorToInt(world.player.transform.position.x)- startX) + " / " + Mathf.FloorToInt(world.player.transform.position.y) + " / " + (Mathf.FloorToInt(world.player.transform.position.z) - startZ) + "\n";
-        debugText += "Chunks: "  + world.playerLastChunkCoord.x + " / " + world.playerLastChunkCoord.z;
+        Vector3 pos = world.player.transform.position;
+        int x = Mathf.FloorToInt(pos.x) - startX;
+        int y = Mathf.FloorToInt(pos.y);
+        int z = Mathf.FloorToInt(pos.z) - startZ;
 
-        text.text = debugText;
+        text.text = "CraftMine Debug Screen\n" +
+                    $"{frameRate}fps\n\n" +
+                    $"XYZ: {x} / {y} / {z}\n" +
+                    $"Chunks: {world.playerLastChunkCoord.x} / {world.playerLastChunkCoord.z}";
 
         if (timer > 1f)
         {

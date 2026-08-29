@@ -67,5 +67,6 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "CraftMine.slnx"
+    "dotnet.defaultSolution": "CraftMine.slnx",
+    "claudeCodeChat.permissions.yoloMode": true
 }
