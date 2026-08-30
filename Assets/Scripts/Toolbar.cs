@@ -21,7 +21,7 @@ public class Toolbar : MonoBehaviour
         {
             // Offset by 1 to skip Air at index 0.
             BlockID blockID = blockIDs[(i+1) % blockIDs.Length];
-            ItemStack stack = new ItemStack(blockID, UnityEngine.Random.Range(2, 65));
+            ItemStack stack = new ItemStack((ushort)blockID, UnityEngine.Random.Range(2, 65));
             ItemSlot slot = new ItemSlot(slots[i], stack);
         }
     }

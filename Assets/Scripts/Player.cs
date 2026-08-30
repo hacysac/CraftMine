@@ -164,7 +164,7 @@ public class Player : MonoBehaviour
             Chunk breakChunk = world.GetChunkFromVector3(breakHighlight.position);
             if (breakChunk != null)
             {
-                breakChunk.EditVoxel(breakHighlight.position, BlockID.Air);
+                breakChunk.EditVoxel(breakHighlight.position, (ushort)BlockID.Air);
             }
         }
         if (placeHighlight.gameObject.activeSelf && Input.GetMouseButtonDown(1))

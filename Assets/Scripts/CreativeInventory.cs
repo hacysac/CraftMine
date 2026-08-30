@@ -18,7 +18,7 @@ public class CreativeInventory : MonoBehaviour
         {
             GameObject newSlot = Instantiate(slotPrefab, transform);
 
-            ItemStack stack = new ItemStack(blockIDs[i % blockIDs.Length], 64);
+            ItemStack stack = new ItemStack((ushort)blockIDs[i % blockIDs.Length], 64);
             ItemSlot slot = new ItemSlot(newSlot.GetComponent<UIItemSlot>(), stack);
 
             slot.isCreative = true;

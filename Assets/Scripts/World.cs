@@ -137,7 +137,7 @@ public class World : MonoBehaviour
 
         for (int y = VoxelData.ChunkHeight - 1; y >= 0; y--)
         {
-            if (GetVoxel(new Vector3(spawnX, y, spawnZ)) != BlockID.Air)
+            if (GetVoxel(new Vector3(spawnX, y, spawnZ)) != (ushort)BlockID.Air)
             {
                 spawnY = y + 1;
                 break;
@@ -178,11 +178,19 @@ public class World : MonoBehaviour
         {
             debugScreen.SetActive(!debugScreen.activeSelf);
         }
-        if (chunksToDraw.Count > 0)
+        // Drain the draw queue with a small per-frame time budget so the startup
+        // backlog clears in a few frames instead of seconds.
+        float drawBudgetEnd = Time.realtimeSinceStartup + 0.008f;
+        while (chunksToDraw.Count > 0 && Time.realtimeSinceStartup < drawBudgetEnd)
         {
-            if (chunksToDraw.Peek().isEditable)
+            if (!chunksToDraw.Peek().isEditable)
             {
-                chunksToDraw.Dequeue().CreateMesh();
+                break;
+            }
+            Chunk drawChunk = chunksToDraw.Dequeue();
+            lock (drawChunk.buildLock)
+            {
+                drawChunk.CreateMesh();
             }
         }
     }
@@ -219,7 +227,10 @@ public class World : MonoBehaviour
             {
                 if (chunksToUpdate[index].isEditable)
                 {
-                    chunksToUpdate[index].UpdateChunk();
+                    lock (chunksToUpdate[index].buildLock)
+                    {
+                        chunksToUpdate[index].UpdateChunk();
+                    }
 
                     // Registers chunks created outside CheckViewDistance (e.g. tree
                     // spillover in ApplyModifications) so they can be deactivated later.
@@ -401,7 +412,7 @@ public class World : MonoBehaviour
         return block.isTransparent;
     }
 
-    public BlockID GetVoxel(Vector3 pos)
+    public ushort GetVoxel(Vector3 pos)
     {
         int yPos = Mathf.FloorToInt(pos.y);
         // Immutable Pass
@@ -409,39 +420,39 @@ public class World : MonoBehaviour
         // if outside return air
         if (!IsVoxelInWorld(pos))
         {
-            return BlockID.Air;
+            return (ushort)BlockID.Air;
         }
         // if at ground return bedrock
         if  (yPos == 0)
         {
-            return BlockID.Bedrock;
+            return (ushort)BlockID.Bedrock;
         }
 
         // Basic Terrain Pass
         float noise = Noise.Get2DPerlin(new Vector2(pos.x, pos.z), 0, biome.terrainScale);
         int terrainHeight = Mathf.FloorToInt(noise * biome.terrainHeight) + biome.solidGroundHeight;
-        BlockID voxelValue = BlockID.Air;
+        ushort voxelValue = (ushort)BlockID.Air;
 
         if (yPos == terrainHeight)
         {
-            voxelValue = BlockID.Grass;
+            voxelValue = (ushort)BlockID.Grass;
         }
         else if (yPos < terrainHeight && yPos > terrainHeight - 4)
         {
-            voxelValue = BlockID.Dirt;
+            voxelValue = (ushort)BlockID.Dirt;
         }
         else if (yPos > terrainHeight)
         {
-            return BlockID.Air;
+            return (ushort)BlockID.Air;
         }
         else
         {
-            voxelValue = BlockID.Stone;
+            voxelValue = (ushort)BlockID.Stone;
         }
 
         // Second Pass
 
-        if (voxelValue == BlockID.Stone)
+        if (voxelValue == (ushort)BlockID.Stone)
         {
             // Check for lode generation
             foreach (Lode lode in biome.lodes)
@@ -451,7 +462,7 @@ public class World : MonoBehaviour
                     bool noise2 = Noise.Get3DPerlin(pos, lode.noiseOffset, lode.scale, lode.threshold);
                     if (noise2)
                     {
-                        voxelValue = lode.block;
+                        voxelValue = (ushort)lode.block;
                     }
                 }
             }
@@ -523,9 +534,9 @@ public class BlockType
 public class VoxelMod
 {
     public Vector3 position;
-    public BlockID id;
+    public ushort id;
 
-    public VoxelMod(Vector3 position, BlockID id, World world)
+    public VoxelMod(Vector3 position, ushort id, World world)
     {
         this.position = position;
         this.id = id;

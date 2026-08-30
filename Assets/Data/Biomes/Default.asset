@@ -18,14 +18,14 @@ MonoBehaviour:
   terrainScale: 0.25
   lodes:
   - lodeName: Dirt Deposit
-    block: 2
+    block: 5
     minHeight: 1
     maxHeight: 128
     scale: 0.1
     noiseOffset: 0
     threshold: 0.5
   - lodeName: Coal Deposit
-    block: 4
+    block: 3
     minHeight: 30
     maxHeight: 128
     scale: 0.2

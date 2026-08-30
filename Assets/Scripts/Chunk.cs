@@ -19,8 +19,9 @@ public class Chunk
     List<int> transparentTriangles = new List<int>();
     List<Vector2> uvs = new List<Vector2>();
 
-    public BlockID [,,] voxelMap = new BlockID[VoxelData.ChunkWidth, VoxelData.ChunkHeight, VoxelData.ChunkWidth];
+    public ushort [,,] voxelMap = new ushort[VoxelData.ChunkWidth, VoxelData.ChunkHeight, VoxelData.ChunkWidth];
     public Queue<VoxelMod> modifications = new Queue<VoxelMod>();
+    public object buildLock = new object();
 
     private bool _isActive;
     private bool isVoxelMapPopulated = false;
@@ -71,8 +72,8 @@ public class Chunk
     // voxelPos is chunk-local (0..ChunkWidth-1), not a world position.
     void AddVoxelDataToChunk(Vector3 voxelPos)
     {
-        BlockID blockID = voxelMap[(int)voxelPos.x, (int)voxelPos.y, (int)voxelPos.z];
-        List<int> faceTriangles = world.blockTypes[(int)blockID].isTransparent ? transparentTriangles : triangles;
+        ushort blockID = voxelMap[(int)voxelPos.x, (int)voxelPos.y, (int)voxelPos.z];
+        List<int> faceTriangles = world.blockTypes[blockID].isTransparent ? transparentTriangles : triangles;
 
         for (int j = 0; j < 6; j++)
         {
@@ -99,7 +100,7 @@ public class Chunk
         }
     }
 
-    public void UpdateChunk()
+    public void UpdateChunk(bool queueForDraw = true)
     {
 
         lock (modifications)
@@ -126,7 +127,10 @@ public class Chunk
                 }
             }
         }
-        world.chunksToDraw.Enqueue(this);
+        if (queueForDraw)
+        {
+            world.chunksToDraw.Enqueue(this);
+        }
     }
 
     void ClearMeshData()
@@ -172,13 +176,13 @@ public class Chunk
         return true;
     }
 
-    public void EditVoxel (Vector3 pos, BlockID newBlock)
+    public void EditVoxel (Vector3 pos, ushort newBlock)
     {
         int xCheck = Mathf.FloorToInt(pos.x - position.x);
         int yCheck = Mathf.FloorToInt(pos.y);
         int zCheck = Mathf.FloorToInt(pos.z - position.z);
 
-        if (!IsVoxelInChunk(xCheck, yCheck, zCheck) || voxelMap[xCheck, yCheck, zCheck] == BlockID.Bedrock)
+        if (!IsVoxelInChunk(xCheck, yCheck, zCheck) || voxelMap[xCheck, yCheck, zCheck] == (ushort)BlockID.Bedrock)
         {
             return;
         }
@@ -187,7 +191,14 @@ public class Chunk
 
         lock (world.ChunkUpdateThreadLock)
         {
-            world.chunksToUpdate.Insert(0,this);
+            // Rebuild this chunk immediately so the edit is visible this frame
+            // instead of waiting behind the startup mesh queue.
+            world.chunksToUpdate.Remove(this);
+            lock (buildLock)
+            {
+                UpdateChunk(false);
+                CreateMesh();
+            }
             UpdateSurroundingVoxels(xCheck, yCheck, zCheck);
         }
     }
@@ -205,7 +216,7 @@ public class Chunk
         }
     }
     
-    public BlockID GetVoxelFromGlobalVector3(Vector3 pos)
+    public ushort GetVoxelFromGlobalVector3(Vector3 pos)
     {
         int xCheck = Mathf.FloorToInt(pos.x - position.x);
         int yCheck = Mathf.FloorToInt(pos.y);
@@ -213,7 +224,7 @@ public class Chunk
 
         if (!IsVoxelInChunk(xCheck, yCheck, zCheck))
         {
-            return BlockID.Air;
+            return (ushort)BlockID.Air;
         }
 
         return voxelMap[xCheck, yCheck, zCheck];
@@ -246,9 +257,9 @@ public class Chunk
         meshFilter.mesh = mesh;
     }
 
-    void AddTexture(BlockID blockID, int faceIndex)
+    void AddTexture(ushort blockID, int faceIndex)
     {
-        FaceUVs uv = world.faceUVCache[(int)blockID, faceIndex];
+        FaceUVs uv = world.faceUVCache[blockID, faceIndex];
 
         uvs.Add(uv.uv00);
         uvs.Add(uv.uv01);

@@ -16,8 +16,8 @@ public static class Structure
         {
             for (int z = -2; z < 3; z++)
             {
-                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 2, position.z + z), BlockID.Oak_Leaves, world));
-                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 3, position.z + z), BlockID.Oak_Leaves, world));
+                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 2, position.z + z), (ushort)BlockID.Oak_Leaves, world));
+                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 3, position.z + z), (ushort)BlockID.Oak_Leaves, world));
             }
         }
 
@@ -25,7 +25,7 @@ public static class Structure
         {
             for (int z = -1; z < 2; z++)
             {
-                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 1, position.z + z), BlockID.Oak_Leaves, world));
+                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height - 1, position.z + z), (ushort)BlockID.Oak_Leaves, world));
             }
         }
         for (int x = -1; x < 2; x++)
@@ -33,14 +33,14 @@ public static class Structure
             if(x==0)
                 for (int z = -1; z < 2; z++)
                 {
-                    queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z + z), BlockID.Oak_Leaves, world));
+                    queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z + z), (ushort)BlockID.Oak_Leaves, world));
                 }
             else
-                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z), BlockID.Oak_Leaves, world));
+                queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z), (ushort)BlockID.Oak_Leaves, world));
         }
         for (int i = 1; i < height; i++)
         {
-            queue.Enqueue(new VoxelMod(new Vector3(position.x, position.y+i, position.z), BlockID.Oak_Log, world));
+            queue.Enqueue(new VoxelMod(new Vector3(position.x, position.y+i, position.z), (ushort)BlockID.Oak_Log, world));
         }
 
         return queue;
