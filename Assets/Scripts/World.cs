@@ -123,12 +123,14 @@ public class World : MonoBehaviour
             if (_inUI)
             {
                 Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
                 creativeInventoryWindow.SetActive(true);
                 cursorSlot.SetActive(true);
             }
             else
             {
                 Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
                 creativeInventoryWindow.SetActive(false);
                 cursorSlot.SetActive(false);
             }
@@ -182,6 +184,7 @@ public class World : MonoBehaviour
             }
         }
 
+        SetGlobalLightValue();
         spawnPosition = new Vector3(spawnX + 0.5f, spawnY + 2, spawnZ + 0.5f);
 
         ChunkUpdateThread = new Thread(new ThreadStart(ThreadedUpdate));
@@ -202,11 +205,14 @@ public class World : MonoBehaviour
         playerLastChunkCoord = GetChunkCoordFromVector3(player.position);
     }
 
-    public void Update()
+    public void SetGlobalLightValue()
     {
-
         Shader.SetGlobalFloat("GlobalLightLevel", globalLightLevel);
         Camera.main.backgroundColor = Color.Lerp(night, day, globalLightLevel);
+    }
+
+    public void Update()
+    {
 
         if (!GetChunkCoordFromVector3(player.position).Equals(playerLastChunkCoord))
         {
@@ -270,7 +276,10 @@ public class World : MonoBehaviour
 
                     // Registers chunks created outside CheckViewDistance (e.g. tree
                     // spillover in ApplyModifications) so they can be deactivated later.
-                    activeChunks.Add(chunksToUpdate[index].chunkCoord);
+                    if (!activeChunks.Contains(chunksToUpdate[index].chunkCoord))
+                    {
+                        activeChunks.Add(chunksToUpdate[index].chunkCoord);
+                    }
 
                     chunksToUpdate.RemoveAt(index);
                     updated = true;

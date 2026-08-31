@@ -19,6 +19,7 @@ public class Chunk
     List<int> transparentTriangles = new List<int>();
     List<Vector2> uvs = new List<Vector2>();
     List<Color> colors = new List<Color>();
+    List<Vector3> normals = new List<Vector3>();
 
     public VoxelState [,,] voxelMap = new VoxelState[VoxelData.ChunkWidth, VoxelData.ChunkHeight, VoxelData.ChunkWidth];
     public Queue<VoxelMod> modifications = new Queue<VoxelMod>();
@@ -40,8 +41,8 @@ public class Chunk
         meshFilter = chunkObject.AddComponent<MeshFilter>();
         meshRenderer = chunkObject.AddComponent<MeshRenderer>();
 
-        //meshRenderer.materials = new Material[] { world.material, world.transparentMaterial };
-        meshRenderer.material = world.material;
+        meshRenderer.materials = new Material[] { world.material, world.transparentMaterial };
+        //meshRenderer.material = world.material;
 
         chunkObject.transform.SetParent(world.transform);
         chunkObject.transform.position = new Vector3(chunkCoord.x * VoxelData.ChunkWidth, 0, chunkCoord.z * VoxelData.ChunkWidth);
@@ -84,10 +85,10 @@ public class Chunk
 
         ushort blockID = voxelMap[x,y,z].id;
         List<int> faceTriangles = triangles;
-        // if (world.blockTypes[blockID].isTransparent)
-        // {
-        //     faceTriangles = transparentTriangles;
-        // }
+        if (world.blockTypes[blockID].renderNeighborFaces)
+        {
+            faceTriangles = transparentTriangles;
+        }
 
         for (int j = 0; j < 6; j++)
         {
@@ -102,6 +103,7 @@ public class Chunk
             for (int v = 0; v < 4; v++)
             {
                 vertices.Add(VoxelData.voxelVerts[VoxelData.voxelTris[j, v]] + voxelPos);
+                normals.Add(VoxelData.faceChecks[j]);
             }
 
             AddTexture(blockID, j);
@@ -224,6 +226,7 @@ public class Chunk
         transparentTriangles.Clear();
         uvs.Clear();
         colors.Clear();
+        normals.Clear();
     }
 
     public bool isActive
@@ -332,13 +335,15 @@ public class Chunk
     {
         Mesh mesh = new Mesh();
         mesh.vertices = vertices.ToArray();
-        // mesh.subMeshCount = 2;
-        // mesh.SetTriangles(triangles.ToArray(), 0);
-        // mesh.SetTriangles(transparentTriangles.ToArray(), 1);
-        mesh.triangles = triangles.ToArray();
+        mesh.subMeshCount = 2;
+        mesh.SetTriangles(triangles.ToArray(), 0);
+        mesh.SetTriangles(transparentTriangles.ToArray(), 1);
+        //mesh.triangles = triangles.ToArray();
         mesh.uv = uvs.ToArray();
         mesh.colors = colors.ToArray();
-        mesh.RecalculateNormals();
+        mesh.normals = normals.ToArray();
+
+        //mesh.RecalculateNormals();
 
         meshFilter.mesh = mesh;
     }

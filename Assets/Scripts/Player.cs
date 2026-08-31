@@ -40,7 +40,7 @@ public class Player : MonoBehaviour
         world = GameObject.Find("World").GetComponent<World>();
         //selectedBlockID = toolbar.slots[0].itemSlot.stack.id;
 
-        Cursor.lockState = CursorLockMode.Locked;
+        world.inUI = false;
     }
 
     private void FixedUpdate()
@@ -143,6 +143,11 @@ public class Player : MonoBehaviour
 
     private void GetInput()
     {
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Application.Quit();
+        }
+
         horizontal = Input.GetAxis("Horizontal");
         vertical = Input.GetAxis("Vertical");
         mouseX = Input.GetAxis("Mouse X");
@@ -155,6 +160,7 @@ public class Player : MonoBehaviour
         if (Input.GetButtonUp("Sprint"))
         {
             isSprinting = false;
+            Debug.Log($"Sprint OFF — raw GetKey(CTRL) = {Input.GetKey(KeyCode.LeftControl)}");
         }
         if (isGrounded && Input.GetButtonDown("Jump"))
         {
