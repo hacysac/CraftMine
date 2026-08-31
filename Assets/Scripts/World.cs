@@ -8,6 +8,11 @@ public class World : MonoBehaviour
 {
     public int seed;
     private bool _inUI = false;
+    [Range(0f, 1f)]
+    public float globalLightLevel;
+
+    public Color day;
+    public Color night;
 
     public Transform player;
     public Material material;
@@ -130,6 +135,9 @@ public class World : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
         Random.InitState(seed);
 
+        Shader.SetGlobalFloat("minGlobalLightLevel", VoxelData.minLightLevel);
+        Shader.SetGlobalFloat("maxGlobalLightLevel", VoxelData.maxLightLevel);
+
         int spawnX = VoxelData.WorldSizeInVoxels / 2;
         int spawnZ = VoxelData.WorldSizeInVoxels / 2;
 
@@ -166,6 +174,10 @@ public class World : MonoBehaviour
 
     public void Update()
     {
+
+        Shader.SetGlobalFloat("GlobalLightLevel", globalLightLevel);
+        Camera.main.backgroundColor = Color.Lerp(night, day, globalLightLevel);
+
         if (!GetChunkCoordFromVector3(player.position).Equals(playerLastChunkCoord))
         {
             CheckViewDistance();
@@ -248,17 +260,26 @@ public class World : MonoBehaviour
     {
         while (true)
         {
+            bool didWork = false;
+
             if (!applyingModifications)
             {
                 ApplyModifications();
+                didWork = true;
             }
             if (chunksToUpdate.Count > 0)
             {
                 UpdateChunks();
+                didWork = true;
+            }
+
+            if (!didWork)
+            {
+                Thread.Sleep(1);
             }
         }
     }
-    
+        
     private void OnDisable()
     {
         ChunkUpdateThread.Abort();
@@ -368,50 +389,35 @@ public class World : MonoBehaviour
         }
     }
 
-    // Resolves the block at a world position, preferring the live chunk data when it is
-    // ready and falling back to procedural generation otherwise. Null when out of world.
-    BlockType BlockTypeAt(Vector3 pos)
+    public bool CheckForVoxel (Vector3 pos) {
+
+        ChunkCoord thisChunk = new ChunkCoord(pos);
+
+        if (!IsChunkInWorld(thisChunk) || pos.y < 0 || pos.y > VoxelData.ChunkHeight)
+            return false;
+
+        if (chunks[thisChunk.x, thisChunk.z] != null && chunks[thisChunk.x, thisChunk.z].isEditable)
+            return blockTypes[chunks[thisChunk.x, thisChunk.z].GetVoxelFromGlobalVector3(pos).id].isSolid;
+
+        return blockTypes[GetVoxel(pos)].isSolid;
+
+    }
+
+    public VoxelState GetVoxelState(Vector3 pos)
     {
-        if (!IsVoxelInWorld(pos))
-        {
+
+        ChunkCoord thisChunk = new ChunkCoord(pos);
+
+        if (!IsChunkInWorld(thisChunk) || pos.y < 0 || pos.y > VoxelData.ChunkHeight)
             return null;
-        }
 
-        ChunkCoord coord = new ChunkCoord(pos);
-        Chunk chunk = chunks[coord.x, coord.z];
+        if (chunks[thisChunk.x, thisChunk.z] != null && chunks[thisChunk.x, thisChunk.z].isEditable)
+            return chunks[thisChunk.x, thisChunk.z].GetVoxelFromGlobalVector3(pos);
 
-        if (chunk != null && chunk.isEditable)
-        {
-            return blockTypes[(int)chunk.GetVoxelFromGlobalVector3(pos)];
-        }
+        return new VoxelState(GetVoxel(pos));
 
-        return blockTypes[(int)GetVoxel(pos)];
     }
-
-    public bool CheckForVoxel(Vector3 pos)
-    {
-        BlockType block = BlockTypeAt(pos);
-
-        if (block == null)
-        {
-            return false;
-        }
-
-        return block.isSolid;
-    }
-
-    public bool CheckIfVoxelTransparent(Vector3 pos)
-    {
-        BlockType block = BlockTypeAt(pos);
-
-        if (block == null)
-        {
-            return false;
-        }
-
-        return block.isTransparent;
-    }
-
+    
     public ushort GetVoxel(Vector3 pos)
     {
         int yPos = Mathf.FloorToInt(pos.y);
@@ -506,7 +512,8 @@ public class BlockType
 {
     public string blockName;
     public bool isSolid;
-    public bool isTransparent;
+    public bool renderNeighborFaces;
+    public float transparency;
     public int maxStackSize;
     public Sprite icon;
 

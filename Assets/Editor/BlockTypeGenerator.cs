@@ -321,7 +321,7 @@ public static class BlockTypeGenerator
                 {
                     blockName = AirName,
                     isSolid = false,
-                    isTransparent = true,
+                    renderNeighborFaces = true,
                     maxStackSize = 64,
                     icon = null,
 
@@ -409,7 +409,7 @@ public static class BlockTypeGenerator
 
                         isSolid = true,
 
-                        isTransparent =
+                        renderNeighborFaces =
                             TransparentBlocks.Contains(
                                 normalizedName
                             ),
@@ -432,7 +432,7 @@ public static class BlockTypeGenerator
             // This does NOT modify:
             //
             //     isSolid
-            //     isTransparent
+            //     renderNeighborFaces
             //     maxStackSize
             //
             // on an existing block.
