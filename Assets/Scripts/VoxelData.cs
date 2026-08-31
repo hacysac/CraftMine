@@ -14,7 +14,6 @@ public static class VoxelData
     {
         get { return WorldSizeInChunks * ChunkWidth; }
     }
-    public static readonly int ViewDistanceInChunks = 5;
 
     public static readonly Vector3[] voxelVerts = new Vector3[8]
     {

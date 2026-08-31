@@ -1,12 +1,12 @@
-using System.Security.AccessControl;
+using System.Collections.Concurrent;
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.U2D;
 using System.Threading;
+using System.IO;
 
 public class World : MonoBehaviour
 {
-    public int seed;
     private bool _inUI = false;
     [Range(0f, 1f)]
     public float globalLightLevel;
@@ -23,6 +23,7 @@ public class World : MonoBehaviour
     public GameObject debugScreen;
     public GameObject creativeInventoryWindow;
     public GameObject cursorSlot;
+    public Settings settings;
 
     public Vector3 spawnPosition;
     public ChunkCoord playerLastChunkCoord;
@@ -31,13 +32,23 @@ public class World : MonoBehaviour
     Chunk[,] chunks = new Chunk[VoxelData.WorldSizeInChunks, VoxelData.WorldSizeInChunks];
     List<ChunkCoord> activeChunks = new List<ChunkCoord>();
     public List<Chunk> chunksToUpdate = new List<Chunk>();
-    List<ChunkCoord> chunksToCreate = new List<ChunkCoord>();
+    // Read (CreateChunk) on the main thread and written (ApplyModifications) on
+    // the worker thread, so it must be thread-safe.
+    ConcurrentQueue<ChunkCoord> chunksToCreate = new ConcurrentQueue<ChunkCoord>();
+    ConcurrentQueue<Chunk> chunksToPopulate = new ConcurrentQueue<Chunk>();
     Queue<Queue<VoxelMod>> modifications = new Queue<Queue<VoxelMod>>();
     public Queue<Chunk> chunksToDraw = new Queue<Chunk>();
     public FaceUVs[,] faceUVCache;
 
     Thread ChunkUpdateThread;
     public object ChunkUpdateThreadLock = new object();
+
+    // Called by Chunk.Init on the main thread; the worker thread does the actual
+    // population via ThreadedUpdate.
+    public void QueueForPopulation(Chunk chunk)
+    {
+        chunksToPopulate.Enqueue(chunk);
+    }
 
     void BuildFaceUVCache()
     {
@@ -126,14 +137,33 @@ public class World : MonoBehaviour
 
     private void Awake()
     {
+        // Settings is only assigned in the Inspector; if it's missing, Player.Update
+        // would throw a NullReferenceException on world.settings.mouseSensitivity
+        // every frame and mouse look would be dead until it's assigned manually.
+        if (settings == null)
+        {
+            settings = new Settings { viewDistance = 5, mouseSensitivity = 1f };
+        }
+        // A serialized Settings object defaults mouseSensitivity to 0, which makes
+        // mouse look completely dead until the value is changed manually.
+        if (settings.mouseSensitivity <= 0f)
+        {
+            settings.mouseSensitivity = 1f;
+        }
         ValidateBlockIDs();
         BuildFaceUVCache();
     }
 
     private void Start()
     {
+        //string jsonExport = JsonUtility.ToJson(settings);
+        //File.WriteAllText(Application.dataPath + "/settings.cfg", jsonExport);
+
+        string jsonImport = File.ReadAllText(Application.dataPath + "/settings.cfg");
+        settings = JsonUtility.FromJson<Settings>(jsonImport);
+
         Cursor.lockState = CursorLockMode.Locked;
-        Random.InitState(seed);
+        Random.InitState(settings.seed);
 
         Shader.SetGlobalFloat("minGlobalLightLevel", VoxelData.minLightLevel);
         Shader.SetGlobalFloat("maxGlobalLightLevel", VoxelData.maxLightLevel);
@@ -153,7 +183,7 @@ public class World : MonoBehaviour
         }
 
         spawnPosition = new Vector3(spawnX + 0.5f, spawnY + 2, spawnZ + 0.5f);
-        
+
         ChunkUpdateThread = new Thread(new ThreadStart(ThreadedUpdate));
         ChunkUpdateThread.Start();
 
@@ -182,9 +212,9 @@ public class World : MonoBehaviour
         {
             CheckViewDistance();
         }
-        if (chunksToCreate.Count > 0)
+        if (chunksToCreate.TryDequeue(out ChunkCoord c))
         {
-            CreateChunk();
+            chunks[c.x, c.z].Init();
         }
         if (Input.GetKeyDown(KeyCode.F3))
         {
@@ -209,13 +239,13 @@ public class World : MonoBehaviour
 
     void GenerateWorld()
     {
-        for (int x = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; x < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; x++)
+        for (int x = VoxelData.WorldSizeInChunks/2 - settings.viewDistance/2; x < VoxelData.WorldSizeInChunks/2 + settings.viewDistance/2; x++)
         {
-            for (int z = VoxelData.WorldSizeInChunks/2 - VoxelData.ViewDistanceInChunks/2; z < VoxelData.WorldSizeInChunks/2 + VoxelData.ViewDistanceInChunks/2; z++)
+            for (int z = VoxelData.WorldSizeInChunks/2 - settings.viewDistance/2; z < VoxelData.WorldSizeInChunks/2 + settings.viewDistance/2; z++)
             {
                 ChunkCoord thisChunk = new ChunkCoord(x,z);
                 chunks[x, z] = new Chunk(thisChunk, this);
-                chunksToCreate.Add(thisChunk);
+                chunksToCreate.Enqueue(thisChunk);
             }
         }
 
@@ -223,12 +253,6 @@ public class World : MonoBehaviour
         CheckViewDistance();
     }
 
-    void CreateChunk()
-    {
-        ChunkCoord c = chunksToCreate[0];
-        chunksToCreate.RemoveAt(0);
-        chunks[c.x,c.z].Init();
-    }
     void UpdateChunks()
     {
         bool updated = false;
@@ -262,6 +286,14 @@ public class World : MonoBehaviour
         {
             bool didWork = false;
 
+            // Population is pure data work, so it runs here instead of on the
+            // main thread (Init just queues it).
+            if (chunksToPopulate.TryDequeue(out Chunk chunkToPopulate))
+            {
+                chunkToPopulate.PopulateVoxelMap();
+                didWork = true;
+            }
+
             if (!applyingModifications)
             {
                 ApplyModifications();
@@ -279,7 +311,7 @@ public class World : MonoBehaviour
             }
         }
     }
-        
+
     private void OnDisable()
     {
         ChunkUpdateThread.Abort();
@@ -304,11 +336,21 @@ public class World : MonoBehaviour
             while(queue.Count > 0)
             {
                 VoxelMod v = queue.Dequeue();
+                // Tree structures can spill past the world edge, where there is no
+                // chunk slot to write into.
+                if (v.position.y < 0 || v.position.y >= VoxelData.ChunkHeight)
+                {
+                    continue;
+                }
                 ChunkCoord c = GetChunkCoordFromVector3(v.position);
+                if (!IsChunkInWorld(c))
+                {
+                    continue;
+                }
                 if (chunks[c.x,c.z] == null)
                 {
                     chunks[c.x, c.z] = new Chunk(c, this);
-                    chunksToCreate.Add(c);
+                    chunksToCreate.Enqueue(c);
                 }
                 Chunk chunk = chunks[c.x, c.z];
 
@@ -352,9 +394,9 @@ public class World : MonoBehaviour
         playerLastChunkCoord = playerChunkCoord;
 
         activeChunks.Clear();
-        for (int x = playerChunkCoord.x - VoxelData.ViewDistanceInChunks; x < playerChunkCoord.x + VoxelData.ViewDistanceInChunks; x++)
+        for (int x = playerChunkCoord.x - settings.viewDistance; x < playerChunkCoord.x + settings.viewDistance; x++)
         {
-            for (int z = playerChunkCoord.z - VoxelData.ViewDistanceInChunks; z < playerChunkCoord.z + VoxelData.ViewDistanceInChunks; z++)
+            for (int z = playerChunkCoord.z - settings.viewDistance; z < playerChunkCoord.z + settings.viewDistance; z++)
             {
                 ChunkCoord thisChunk = new ChunkCoord(x, z);
                 if (IsChunkInWorld(thisChunk))
@@ -363,7 +405,7 @@ public class World : MonoBehaviour
                     if (chunks[x, z] == null)
                     {
                         chunks[x,z] = new Chunk(thisChunk, this);
-                        chunksToCreate.Add(thisChunk);
+                        chunksToCreate.Enqueue(thisChunk);
                     }
                     else if (!chunks[x, z].isActive)
                     {
@@ -417,7 +459,7 @@ public class World : MonoBehaviour
         return new VoxelState(GetVoxel(pos));
 
     }
-    
+
     public ushort GetVoxel(Vector3 pos)
     {
         int yPos = Mathf.FloorToInt(pos.y);
@@ -554,4 +596,21 @@ public class VoxelMod
 public struct FaceUVs
 {
     public Vector2 uv00, uv01, uv10, uv11; // min-min, min-max, max-min, max-max
+}
+
+[System.Serializable]
+public class Settings
+{
+    [Header("Game Data")]
+    public string version;
+
+    [Header("Performance")]
+    public int viewDistance;
+    
+    [Header("Controls")]
+    [Range(0.5f, 10f)]
+    public float mouseSensitivity;
+
+    [Header("World Gen")]
+    public int seed;
 }

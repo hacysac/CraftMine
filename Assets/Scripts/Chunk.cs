@@ -49,10 +49,13 @@ public class Chunk
         position = chunkObject.transform.position;   // now correctly reflects the chunk's actual world position
         chunkObject.name += " " + (position.x/VoxelData.ChunkWidth) + "," + (position.z/VoxelData.ChunkWidth);
 
-        PopulateVoxelMap();
+        // Population is pure data work (noise + thousands of allocations), so it
+        // runs on the worker thread instead of spiking the main thread every
+        // time a new chunk comes into view.
+        world.QueueForPopulation(this);
     }
 
-    void PopulateVoxelMap()
+    public void PopulateVoxelMap()
     {
         for (int y = 0; y < VoxelData.ChunkHeight; y++)
         {
@@ -90,7 +93,7 @@ public class Chunk
         {
 
             VoxelState neighbor = CheckVoxel(voxelPos + VoxelData.faceChecks[j]);
-            
+
             if (neighbor == null || !world.blockTypes[neighbor.id].renderNeighborFaces)
             {
                 continue;
@@ -105,7 +108,7 @@ public class Chunk
 
             float lightLevel = neighbor.globalLightPercent;
 
-            
+
 
             colors.Add(new Color(0, 0, 0, lightLevel));
             colors.Add(new Color(0, 0, 0, lightLevel));
@@ -184,7 +187,7 @@ public class Chunk
 
                     if (lightRay > VoxelData.lightFalloff)
                     {
-                        litVoxels.Enqueue(new Vector3Int(x, y, z)); 
+                        litVoxels.Enqueue(new Vector3Int(x, y, z));
                     }
 
                 }
@@ -226,9 +229,9 @@ public class Chunk
     public bool isActive
     {
         get { return _isActive; }
-        set 
-        { 
-            _isActive = value; 
+        set
+        {
+            _isActive = value;
             if(chunkObject != null)
             {
                 chunkObject.SetActive(value);
@@ -296,7 +299,7 @@ public class Chunk
             }
         }
     }
-    
+
     public VoxelState GetVoxelFromGlobalVector3(Vector3 pos)
     {
         int xCheck = Mathf.FloorToInt(pos.x - position.x);
@@ -406,7 +409,7 @@ public class VoxelState
         id = (ushort)BlockID.Air;
         globalLightPercent = 0f;
     }
-    
+
     public VoxelState(ushort id)
     {
         this.id = id;

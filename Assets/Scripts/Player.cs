@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using UnityEngine;
 
 public class Player : MonoBehaviour
-{   
+{
     public Transform camera;
     public World world;
     public Transform breakHighlight;
@@ -23,7 +23,7 @@ public class Player : MonoBehaviour
 
     public float checkIncrement = 0.1f;
     public float reach = 8f;
-    
+
     private float horizontal;
     private float vertical;
     private float mouseX;
@@ -68,13 +68,15 @@ public class Player : MonoBehaviour
         if (!world.inUI)
         {
             GetInput();
-            PlaceCursorBlocks();
 
-            transform.Rotate(Vector3.up * mouseX);
-            xRotation -= mouseY;
+            // Apply mouse look in Update, not FixedUpdate — mouse deltas are per-frame,
+            // and FixedUpdate runs on the physics clock so most deltas get overwritten/lost.
+            transform.Rotate(Vector3.up * mouseX * world.settings.mouseSensitivity);
+            xRotation -= mouseY * world.settings.mouseSensitivity;
             xRotation = Mathf.Clamp(xRotation, -90f, 90f);
-
             camera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+
+            PlaceCursorBlocks();
         }
     }
 

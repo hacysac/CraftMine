@@ -1232,7 +1232,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 093069b1cf206784fbe153b0b5440df6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::World
-  seed: 3456789
   globalLightLevel: 1
   day: {r: 0, g: 0.8145138, b: 1, a: 0}
   night: {r: 0.0045389733, g: 0.098549075, b: 0.3207547, a: 0}
@@ -1413,6 +1412,11 @@ MonoBehaviour:
   debugScreen: {fileID: 706622268}
   creativeInventoryWindow: {fileID: 1201020235}
   cursorSlot: {fileID: 504951694}
+  settings:
+    version: 
+    viewDistance: 9
+    mouseSensitivity: 2
+    seed: 62625
   spawnPosition: {x: 0, y: 0, z: 0}
 --- !u!4 &875963154
 Transform:
