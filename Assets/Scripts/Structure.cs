@@ -2,10 +2,23 @@ using UnityEngine;
 using System.Collections.Generic;
 public static class Structure
 {
-    public static Queue<VoxelMod> MakeTree (Vector3 position, int minTrunkHeight, int maxTrunkHeight, World world)
+
+    public static Queue<VoxelMod> GenerateMajorFlora (int index, Vector3 position, int minTrunkHeight, int maxTrunkHeight, World world)
+    {
+        switch (index)
+        {
+            case 0:
+                return MakeTree(position, minTrunkHeight, maxTrunkHeight, world);
+            case 1:
+                return MakeCacti(position, minTrunkHeight, maxTrunkHeight, world);
+        }
+
+        return new Queue<VoxelMod>();
+    }
+    public static Queue<VoxelMod> MakeTree(Vector3 position, int minTrunkHeight, int maxTrunkHeight, World world)
     {
         Queue<VoxelMod> queue = new Queue<VoxelMod>();
-        int height = (int) (maxTrunkHeight * Noise.Get2DPerlin(new Vector2(position.x, position.z), 600f, 3f));
+        int height = (int)(maxTrunkHeight * Noise.Get2DPerlin(new Vector2(position.x, position.z), 600f, 3f));
         if (height < minTrunkHeight)
         {
             height = minTrunkHeight;
@@ -30,7 +43,7 @@ public static class Structure
         }
         for (int x = -1; x < 2; x++)
         {
-            if(x==0)
+            if (x == 0)
                 for (int z = -1; z < 2; z++)
                 {
                     queue.Enqueue(new VoxelMod(new Vector3(position.x + x, position.y + height, position.z + z), (ushort)BlockID.Oak_Leaves, world));
@@ -40,9 +53,27 @@ public static class Structure
         }
         for (int i = 1; i < height; i++)
         {
-            queue.Enqueue(new VoxelMod(new Vector3(position.x, position.y+i, position.z), (ushort)BlockID.Oak_Log, world));
+            queue.Enqueue(new VoxelMod(new Vector3(position.x, position.y + i, position.z), (ushort)BlockID.Oak_Log, world));
+        }
+
+        return queue;
+    }
+    
+    public static Queue<VoxelMod> MakeCacti (Vector3 position, int minTrunkHeight, int maxTrunkHeight, World world)
+    {
+        Queue<VoxelMod> queue = new Queue<VoxelMod>();
+        int height = (int) (maxTrunkHeight * Noise.Get2DPerlin(new Vector2(position.x, position.z), 234f, 2f));
+        if (height < minTrunkHeight)
+        {
+            height = minTrunkHeight;
+        }
+
+        for (int i = 1; i < height; i++)
+        {
+            queue.Enqueue(new VoxelMod(new Vector3(position.x, position.y+i, position.z), (ushort)BlockID.Cactus_Middle, world));
         }
 
         return queue;
     }
 }
+

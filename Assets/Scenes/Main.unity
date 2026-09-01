@@ -1254,6 +1254,30 @@ MonoBehaviour:
     bottomFaceTexture: {fileID: 21300000, guid: 2a1dc46949edc5f458a7cba99149b73c, type: 3}
     leftFaceTexture: {fileID: 21300000, guid: 2a1dc46949edc5f458a7cba99149b73c, type: 3}
     rightFaceTexture: {fileID: 21300000, guid: 2a1dc46949edc5f458a7cba99149b73c, type: 3}
+  - blockName: Cactus End
+    isSolid: 1
+    renderNeighborFaces: 0
+    transparency: 0
+    maxStackSize: 64
+    icon: {fileID: 0}
+    backFaceTexture: {fileID: 21300000, guid: ddff51d294b107441ba630d837dccdc9, type: 3}
+    frontFaceTexture: {fileID: 21300000, guid: ddff51d294b107441ba630d837dccdc9, type: 3}
+    topFaceTexture: {fileID: 21300000, guid: e5bf72cc423881a4d8617d0d977216a1, type: 3}
+    bottomFaceTexture: {fileID: 21300000, guid: d7928d65734a7b24aa268c24ba3928b8, type: 3}
+    leftFaceTexture: {fileID: 21300000, guid: ddff51d294b107441ba630d837dccdc9, type: 3}
+    rightFaceTexture: {fileID: 21300000, guid: ddff51d294b107441ba630d837dccdc9, type: 3}
+  - blockName: Cactus Middle
+    isSolid: 1
+    renderNeighborFaces: 0
+    transparency: 0
+    maxStackSize: 64
+    icon: {fileID: 0}
+    backFaceTexture: {fileID: 21300000, guid: a33dd129ee2d10941ad2799d4d382acc, type: 3}
+    frontFaceTexture: {fileID: 21300000, guid: a33dd129ee2d10941ad2799d4d382acc, type: 3}
+    topFaceTexture: {fileID: 21300000, guid: 0f4f2f6dec44bab43a9ffc91c63f3999, type: 3}
+    bottomFaceTexture: {fileID: 21300000, guid: 0f4f2f6dec44bab43a9ffc91c63f3999, type: 3}
+    leftFaceTexture: {fileID: 21300000, guid: a33dd129ee2d10941ad2799d4d382acc, type: 3}
+    rightFaceTexture: {fileID: 21300000, guid: a33dd129ee2d10941ad2799d4d382acc, type: 3}
   - blockName: Coal Ore
     isSolid: 1
     renderNeighborFaces: 0
@@ -1386,13 +1410,18 @@ MonoBehaviour:
     bottomFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
     leftFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
     rightFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
-  biome: {fileID: 11400000, guid: c52d1f30382c7f34baaa1cf3654df09c, type: 2}
+  biomes:
+  - {fileID: 11400000, guid: c00d96bd124ff8a4ea259665589f6abc, type: 2}
+  - {fileID: 11400000, guid: 1a7c3f92b45de6248b1f0d3c9e5a7261, type: 2}
+  - {fileID: 11400000, guid: 6b2e8d14c93af5578a4c1e0b7d296f83, type: 2}
+  - {fileID: 11400000, guid: c52d1f30382c7f34baaa1cf3654df09c, type: 2}
   debugScreen: {fileID: 706622268}
   creativeInventoryWindow: {fileID: 1201020235}
   cursorSlot: {fileID: 504951694}
   settings:
     version: 
     viewDistance: 9
+    doChunkAnimation: 1
     mouseSensitivity: 2
     seed: 62625
   spawnPosition: {x: 0, y: 0, z: 0}

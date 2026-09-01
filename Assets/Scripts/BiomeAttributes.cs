@@ -1,32 +1,33 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "BiomeAttributes", menuName = "MinecraftTutorial/Biome Attribute")]
+[CreateAssetMenu(fileName = "BiomeAttributes", menuName = "MinecraftTutorial/BiomeAttributes")]
 public class BiomeAttributes : ScriptableObject
 {
     public string biomeName;
-    public int solidGroundHeight;
     public int terrainHeight;
     public float terrainScale;
     public Lode[] lodes;
 
-    [Header("Trees")]
-    public float treeZoneScale = 1.3f;
-    [Range(0.1f,1f)]
-    public float treeZoneThreshold = 0.6f;
-    public float treePlacementScale = 15f;
-    public float treePlacementThreshold = 0.8f;
-    public int maxTreeHeight = 12;
-    public int minTreeHeight = 5;
-}
+    public BlockID surfaceBlock;
+    public BlockID subSurfaceBlock;
 
-[System.Serializable]
-public class Lode
-{
-    public string lodeName;
-    public BlockID block;
-    public int minHeight;
-    public int maxHeight;
+    // Assigned by World.InitNoiseOffsets from the world seed. Not set here, because
+    // ScriptableObject.Awake runs when Unity loads the asset - before the seed has
+    // been read from settings.cfg.
+    [System.NonSerialized]
+    public float offset;
+
+    [Header("Noise Offsets")]
     public float scale;
-    public float noiseOffset;
-    public float threshold;
+
+    [Header("Major Flora")]
+    public FloraType majorFloraIndex;
+    public float majorFloraZoneScale = 1.3f;
+    [Range(0.1f,1f)]
+    public float majorFloraZoneThreshold = 0.6f;
+    public float majorFloraPlacementScale = 15f;
+    public float majorFloraPlacementThreshold = 0.8f;
+    public bool placeMajorFlora = true;
+    public int maxHeight = 12;
+    public int minHeight = 5;
 }

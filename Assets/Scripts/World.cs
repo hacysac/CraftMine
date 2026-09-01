@@ -19,7 +19,7 @@ public class World : MonoBehaviour
     public Material transparentMaterial;
     public SpriteAtlas blockAtlas;
     public BlockType[] blockTypes;
-    public BiomeAttributes biome;
+    public BiomeAttributes[] biomes;
     public GameObject debugScreen;
     public GameObject creativeInventoryWindow;
     public GameObject cursorSlot;
@@ -37,7 +37,9 @@ public class World : MonoBehaviour
     ConcurrentQueue<ChunkCoord> chunksToCreate = new ConcurrentQueue<ChunkCoord>();
     ConcurrentQueue<Chunk> chunksToPopulate = new ConcurrentQueue<Chunk>();
     Queue<Queue<VoxelMod>> modifications = new Queue<Queue<VoxelMod>>();
-    public Queue<Chunk> chunksToDraw = new Queue<Chunk>();
+    // Written (UpdateChunk) on the worker thread and read (Update) on the main
+    // thread, so it must be thread-safe for the same reason as the two above.
+    public ConcurrentQueue<Chunk> chunksToDraw = new ConcurrentQueue<Chunk>();
     public FaceUVs[,] faceUVCache;
 
     Thread ChunkUpdateThread;
@@ -166,6 +168,8 @@ public class World : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.Locked;
         Random.InitState(settings.seed);
+        // Must run before the spawn search below, which already calls GetVoxel.
+        InitNoiseOffsets();
 
         Shader.SetGlobalFloat("minGlobalLightLevel", VoxelData.minLightLevel);
         Shader.SetGlobalFloat("maxGlobalLightLevel", VoxelData.maxLightLevel);
@@ -205,6 +209,35 @@ public class World : MonoBehaviour
         playerLastChunkCoord = GetChunkCoordFromVector3(player.position);
     }
 
+    // Derives every noise offset from the world seed and the asset's name, so the
+    // same seed reproduces the same world. Asset names are read here on the main
+    // thread because UnityEngine.Object.name is not safe to touch from the chunk
+    // worker thread, where GetVoxel later reads these offsets.
+    void InitNoiseOffsets()
+    {
+        foreach (BiomeAttributes biome in biomes)
+        {
+            if (biome == null)
+            {
+                continue;
+            }
+
+            biome.offset = Noise.SeedOffset(biome.name, settings.seed);
+
+            foreach (Lode lode in biome.lodes)
+            {
+                if (lode == null)
+                {
+                    continue;
+                }
+
+                // Lodes are shared between biomes, so this can assign the same lode
+                // more than once. That is fine: the value depends only on the lode.
+                lode.noiseOffset = Noise.SeedOffset(lode.name, settings.seed);
+            }
+        }
+    }
+
     public void SetGlobalLightValue()
     {
         Shader.SetGlobalFloat("GlobalLightLevel", globalLightLevel);
@@ -229,13 +262,18 @@ public class World : MonoBehaviour
         // Drain the draw queue with a small per-frame time budget so the startup
         // backlog clears in a few frames instead of seconds.
         float drawBudgetEnd = Time.realtimeSinceStartup + 0.008f;
-        while (chunksToDraw.Count > 0 && Time.realtimeSinceStartup < drawBudgetEnd)
+        // TryPeek then TryDequeue is safe because Update is the only consumer.
+        while (Time.realtimeSinceStartup < drawBudgetEnd
+               && chunksToDraw.TryPeek(out Chunk next))
         {
-            if (!chunksToDraw.Peek().isEditable)
+            if (!next.isEditable)
             {
                 break;
             }
-            Chunk drawChunk = chunksToDraw.Dequeue();
+            if (!chunksToDraw.TryDequeue(out Chunk drawChunk))
+            {
+                break;
+            }
             lock (drawChunk.buildLock)
             {
                 drawChunk.CreateMesh();
@@ -308,7 +346,16 @@ public class World : MonoBehaviour
                 ApplyModifications();
                 didWork = true;
             }
-            if (chunksToUpdate.Count > 0)
+            // Count is read under the lock because EditVoxel mutates this list from
+            // the main thread; an unsynchronised List.Count can observe a torn value
+            // mid-insert.
+            int pending;
+            lock (ChunkUpdateThreadLock)
+            {
+                pending = chunksToUpdate.Count;
+            }
+
+            if (pending > 0)
             {
                 UpdateChunks();
                 didWork = true;
@@ -383,7 +430,7 @@ public class World : MonoBehaviour
         applyingModifications = false;
     }
 
-    ChunkCoord GetChunkCoordFromVector3(Vector3 pos)
+    public ChunkCoord GetChunkCoordFromVector3(Vector3 pos)
     {
         int x = Mathf.FloorToInt(pos.x / VoxelData.ChunkWidth);
         int z = Mathf.FloorToInt(pos.z / VoxelData.ChunkWidth);
@@ -419,6 +466,10 @@ public class World : MonoBehaviour
                     else if (!chunks[x, z].isActive)
                     {
                         chunks[x, z].isActive = true;
+                        if (settings.doChunkAnimation && chunks[x, z].chunkObject != null)
+                        {
+                            chunks[x,z].chunkObject.AddComponent<ChunkAnimation>();
+                        }
                     }
                     activeChunks.Add(thisChunk);
                 }
@@ -480,23 +531,62 @@ public class World : MonoBehaviour
             return (ushort)BlockID.Air;
         }
         // if at ground return bedrock
-        if  (yPos == 0)
+        if (yPos == 0)
         {
             return (ushort)BlockID.Bedrock;
         }
 
+        //Biome Selection Pass
+ 
+        int solidGroundHeight = 42;
+        float sumOfHeights = 0f;
+        int count = 0;
+        float strongestWeight = 0f;
+        int strongestBiomeIndex = 0;
+
+        for (int i = 0; i < biomes.Length; i++) {
+
+            float weight = Noise.Get2DPerlin(new Vector2(pos.x, pos.z), biomes[i].offset, biomes[i].scale);
+
+            // Keep track of which weight is strongest.
+            if (weight > strongestWeight) {
+
+                strongestWeight = weight;
+                strongestBiomeIndex = i;
+
+            }
+
+            // Get the height of the terrain (for the current biome) and multiply it by its weight.
+            float height = biomes[i].terrainHeight * Noise.Get2DPerlin(new Vector2(pos.x, pos.z), 0, biomes[i].terrainScale) * weight;
+
+            // If the height value is greater 0 add it to the sum of heights.
+            if (height > 0) {
+
+                sumOfHeights += height;
+                count++;
+
+            }
+
+        }
+          // Set biome to the one with the strongest weight.
+        BiomeAttributes biome = biomes[strongestBiomeIndex];
+
+        // Get the average of the heights.
+        sumOfHeights /= count;
+
+        int terrainHeight = Mathf.FloorToInt(sumOfHeights + solidGroundHeight);
+            
+
         // Basic Terrain Pass
-        float noise = Noise.Get2DPerlin(new Vector2(pos.x, pos.z), 0, biome.terrainScale);
-        int terrainHeight = Mathf.FloorToInt(noise * biome.terrainHeight) + biome.solidGroundHeight;
         ushort voxelValue = (ushort)BlockID.Air;
 
         if (yPos == terrainHeight)
         {
-            voxelValue = (ushort)BlockID.Grass;
+            voxelValue = (ushort)biome.surfaceBlock;
         }
         else if (yPos < terrainHeight && yPos > terrainHeight - 4)
         {
-            voxelValue = (ushort)BlockID.Dirt;
+            voxelValue = (ushort)biome.subSurfaceBlock;
         }
         else if (yPos > terrainHeight)
         {
@@ -507,17 +597,14 @@ public class World : MonoBehaviour
             voxelValue = (ushort)BlockID.Stone;
         }
 
-        // Second Pass
-
-        if (voxelValue == (ushort)BlockID.Stone)
+        // Lode Pass
+        foreach (Lode lode in biome.lodes)
         {
-            // Check for lode generation
-            foreach (Lode lode in biome.lodes)
+            foreach (BlockID blockType in lode.replaceables)
             {
-                if (yPos > lode.minHeight && yPos < lode.maxHeight)
+                if ((ushort) blockType == voxelValue && yPos > lode.minHeight && yPos < lode.maxHeight)
                 {
-                    bool noise2 = Noise.Get3DPerlin(pos, lode.noiseOffset, lode.scale, lode.threshold);
-                    if (noise2)
+                    if (lode.Contains(pos))
                     {
                         voxelValue = (ushort)lode.block;
                     }
@@ -526,16 +613,16 @@ public class World : MonoBehaviour
         }
 
         //Tree Pass
-        if(yPos == terrainHeight)
+        if(yPos == terrainHeight && biome.placeMajorFlora)
         {
-            if (Noise.Get2DPerlin(new Vector2(pos.x, pos.z), 0, biome.treeZoneScale) > biome.treeZoneThreshold)
+            if (Noise.Get2DPerlin(new Vector2(pos.x, pos.z), 0, biome.majorFloraZoneScale) > biome.majorFloraZoneThreshold)
             {
-                if (Noise.Get2DPerlin(new Vector2(pos.x,pos.z), 0, biome.treePlacementScale) > biome.treePlacementThreshold)
+                if (Noise.Get2DPerlin(new Vector2(pos.x,pos.z), 0, biome.majorFloraPlacementScale) > biome.majorFloraPlacementThreshold)
                 {
-                    Queue<VoxelMod> tree = Structure.MakeTree(pos, biome.minTreeHeight, biome.maxTreeHeight,this);
+                    Queue<VoxelMod> majorFlora = Structure.GenerateMajorFlora((int) biome.majorFloraIndex, pos, biome.minHeight, biome.maxHeight,this);
                     lock (modifications)
                     {
-                        modifications.Enqueue(tree);
+                        modifications.Enqueue(majorFlora);
                     }
                 }
             }
@@ -544,13 +631,13 @@ public class World : MonoBehaviour
         return voxelValue;
     }
 
-    bool IsChunkInWorld(ChunkCoord chunkCoord)
+    public bool IsChunkInWorld(ChunkCoord chunkCoord)
     {
         return chunkCoord.x >= 0 && chunkCoord.x < VoxelData.WorldSizeInChunks
             && chunkCoord.z >= 0 && chunkCoord.z < VoxelData.WorldSizeInChunks;
     }
 
-    bool IsVoxelInWorld(Vector3 pos)
+    public bool IsVoxelInWorld(Vector3 pos)
     {
         return pos.x >= 0 && pos.x < VoxelData.WorldSizeInVoxels
             && pos.y >= 0 && pos.y < VoxelData.ChunkHeight
@@ -615,11 +702,18 @@ public class Settings
 
     [Header("Performance")]
     public int viewDistance;
-    
+    public bool doChunkAnimation;
+
     [Header("Controls")]
     [Range(0.5f, 10f)]
     public float mouseSensitivity;
 
     [Header("World Gen")]
     public int seed;
+}
+
+public enum FloraType
+{
+    Oak_Tree,
+    Cactus
 }

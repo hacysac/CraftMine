@@ -5,7 +5,7 @@ using System.Threading;
 public class Chunk
 {
 
-    GameObject chunkObject;
+    public GameObject chunkObject;
     World world;
     public ChunkCoord chunkCoord;
     public MeshRenderer meshRenderer;
@@ -41,19 +41,35 @@ public class Chunk
         meshFilter = chunkObject.AddComponent<MeshFilter>();
         meshRenderer = chunkObject.AddComponent<MeshRenderer>();
 
-        meshRenderer.materials = new Material[] { world.material, world.transparentMaterial };
-        //meshRenderer.material = world.material;
+        meshRenderer.materials = new Material[]
+        {
+            world.material,
+            world.transparentMaterial
+        };
 
         chunkObject.transform.SetParent(world.transform);
-        chunkObject.transform.position = new Vector3(chunkCoord.x * VoxelData.ChunkWidth, 0, chunkCoord.z * VoxelData.ChunkWidth);
 
-        position = chunkObject.transform.position;   // now correctly reflects the chunk's actual world position
-        chunkObject.name += " " + (position.x/VoxelData.ChunkWidth) + "," + (position.z/VoxelData.ChunkWidth);
+        chunkObject.transform.position =
+            new Vector3(
+                chunkCoord.x * VoxelData.ChunkWidth,
+                0,
+                chunkCoord.z * VoxelData.ChunkWidth
+            );
 
-        // Population is pure data work (noise + thousands of allocations), so it
-        // runs on the worker thread instead of spiking the main thread every
-        // time a new chunk comes into view.
+        position = chunkObject.transform.position;
+
+        chunkObject.name += " " +
+            (position.x / VoxelData.ChunkWidth) + "," +
+            (position.z / VoxelData.ChunkWidth);
+
+        isActive = true;
+
         world.QueueForPopulation(this);
+
+        if (world.settings.doChunkAnimation)
+        {
+            chunkObject.AddComponent<ChunkAnimation>();
+        }
     }
 
     public void PopulateVoxelMap()
@@ -292,13 +308,34 @@ public class Chunk
 
     void UpdateSurroundingVoxels(int x, int y, int z)
     {
-        Vector3 thisVoxel = new Vector3(x,y,z);
+        Vector3 thisVoxel = new Vector3(x, y, z);
+
         for (int j = 0; j < 6; j++)
         {
             Vector3 currentVoxel = thisVoxel + VoxelData.faceChecks[j];
-            if (!IsVoxelInChunk((int) currentVoxel.x, (int) currentVoxel.y, (int)currentVoxel.z))
+
+            if (!IsVoxelInChunk(
+                (int)currentVoxel.x,
+                (int)currentVoxel.y,
+                (int)currentVoxel.z))
             {
-                world.chunksToUpdate.Insert(0,world.GetChunkFromVector3(currentVoxel + position));
+                Vector3 globalVoxel = currentVoxel + position;
+                ChunkCoord coord = world.GetChunkCoordFromVector3(globalVoxel);
+
+                // Don't try to access a chunk outside the world.
+                if (!world.IsChunkInWorld(coord))
+                    continue;
+
+                Chunk neighborChunk = world.GetChunkFromVector3(globalVoxel);
+
+                // Caller holds ChunkUpdateThreadLock, so the list is safe to inspect.
+                // Without the Contains check an edge block queues the same neighbor
+                // once per touching face, and each duplicate is a full 32k-voxel
+                // rebuild that delays the mesh the player is waiting to see.
+                if (neighborChunk != null && !world.chunksToUpdate.Contains(neighborChunk))
+                {
+                    world.chunksToUpdate.Insert(0, neighborChunk);
+                }
             }
         }
     }
@@ -323,12 +360,22 @@ public class Chunk
         int y = Mathf.FloorToInt(pos.y);
         int z = Mathf.FloorToInt(pos.z);
 
-        if (!IsVoxelInChunk(x, y, z))
+        Vector3 globalPos = pos + position;
+
+        // Outside the world is air.
+        if (!world.IsVoxelInWorld(globalPos))
         {
-            return world.GetVoxelState(pos + position);
+            return new VoxelState((ushort)BlockID.Air);
         }
 
-        return voxelMap[x, y, z];
+        // Neighbor is in this chunk.
+        if (IsVoxelInChunk(x, y, z))
+        {
+            return voxelMap[x, y, z];
+        }
+
+        // Neighbor is in another chunk.
+        return world.GetVoxelState(globalPos);
     }
 
     public void CreateMesh()

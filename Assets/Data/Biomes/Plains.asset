@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33c49811767ccd34c83267b7e2bf02bf, type: 3}
+  m_Name: Plains
+  m_EditorClassIdentifier: Assembly-CSharp::BiomeAttribute
+  biomeName: Plains
+  terrainHeight: 18
+  terrainScale: 0.12
+  lodes:
+  - {fileID: 11400000, guid: 0fea9f075681ab949aba0c427aaa029d, type: 2}
+  - {fileID: 11400000, guid: 4421fd0817bb25645abff98fba960c91, type: 2}
+  - {fileID: 11400000, guid: c3e475ca6531d8444b7b627f8fa0b01d, type: 2}
+  surfaceBlock: 10
+  subSurfaceBlock: 7
+  scale: 0.08
+  majorFloraIndex: 0
+  majorFloraZoneScale: 1.3
+  majorFloraZoneThreshold: 0.55
+  majorFloraPlacementScale: 15
+  majorFloraPlacementThreshold: 0.82
+  placeMajorFlora: 1
+  maxHeight: 9
+  minHeight: 5

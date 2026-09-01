@@ -153,15 +153,7 @@ public class Player : MonoBehaviour
         mouseX = Input.GetAxis("Mouse X");
         mouseY = Input.GetAxis("Mouse Y");
 
-        if (Input.GetButtonDown("Sprint"))
-        {
-            isSprinting = true;
-        }
-        if (Input.GetButtonUp("Sprint"))
-        {
-            isSprinting = false;
-            Debug.Log($"Sprint OFF — raw GetKey(CTRL) = {Input.GetKey(KeyCode.LeftControl)}");
-        }
+        isSprinting = Input.GetKey(KeyCode.LeftControl);
         if (isGrounded && Input.GetButtonDown("Jump"))
         {
             jumpRequest = true;
