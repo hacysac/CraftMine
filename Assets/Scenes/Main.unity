@@ -1210,13 +1210,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 093069b1cf206784fbe153b0b5440df6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::World
-  globalLightLevel: 1
-  day: {r: 0, g: 0.8145138, b: 1, a: 0}
-  night: {r: 0.0045389733, g: 0.098549075, b: 0.3207547, a: 0}
   player: {fileID: 51725480}
   material: {fileID: 2100000, guid: d4707aae467a8e9428b7f7f943a05863, type: 2}
   transparentMaterial: {fileID: 2100000, guid: 0a1e1e96df0406941b7574a85b7bfae9, type: 2}
   blockAtlas: {fileID: 100100200, guid: 2f6401fbb9f885c4693c584ebaccb2d7, type: 3}
+  biomes:
+  - {fileID: 11400000, guid: c00d96bd124ff8a4ea259665589f6abc, type: 2}
+  - {fileID: 11400000, guid: 1a7c3f92b45de6248b1f0d3c9e5a7261, type: 2}
+  - {fileID: 11400000, guid: 6b2e8d14c93af5578a4c1e0b7d296f83, type: 2}
+  - {fileID: 11400000, guid: c52d1f30382c7f34baaa1cf3654df09c, type: 2}
+  debugScreen: {fileID: 706622268}
+  creativeInventoryWindow: {fileID: 1201020235}
+  cursorSlot: {fileID: 504951694}
+  settings:
+    version: 0.0.1
+    viewDistance: 9
+    doChunkAnimation: 1
+    mouseSensitivity: 2
+    seed: 567893297
+    doDaylightCycle: 1
+    dayLength: 1200
+    timeTransitionLength: 50
   blockTypes:
   - blockName: Air
     isSolid: 0
@@ -1410,21 +1424,13 @@ MonoBehaviour:
     bottomFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
     leftFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
     rightFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
-  biomes:
-  - {fileID: 11400000, guid: c00d96bd124ff8a4ea259665589f6abc, type: 2}
-  - {fileID: 11400000, guid: 1a7c3f92b45de6248b1f0d3c9e5a7261, type: 2}
-  - {fileID: 11400000, guid: 6b2e8d14c93af5578a4c1e0b7d296f83, type: 2}
-  - {fileID: 11400000, guid: c52d1f30382c7f34baaa1cf3654df09c, type: 2}
-  debugScreen: {fileID: 706622268}
-  creativeInventoryWindow: {fileID: 1201020235}
-  cursorSlot: {fileID: 504951694}
-  settings:
-    version: 
-    viewDistance: 9
-    doChunkAnimation: 1
-    mouseSensitivity: 2
-    seed: 62625
   spawnPosition: {x: 0, y: 0, z: 0}
+  globalLightLevel: 1
+  dayTime: 0
+  inTimeTransition: 0
+  dayNight: -1
+  day: {r: 0.49411765, g: 0.65882355, b: 1, a: 0}
+  night: {r: 0, g: 0.072676465, b: 0.24528301, a: 0}
 --- !u!4 &875963154
 Transform:
   m_ObjectHideFlags: 0

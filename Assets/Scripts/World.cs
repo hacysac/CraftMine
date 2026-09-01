@@ -8,22 +8,17 @@ using System.IO;
 public class World : MonoBehaviour
 {
     private bool _inUI = false;
-    [Range(0f, 1f)]
-    public float globalLightLevel;
-
-    public Color day;
-    public Color night;
 
     public Transform player;
     public Material material;
     public Material transparentMaterial;
     public SpriteAtlas blockAtlas;
-    public BlockType[] blockTypes;
     public BiomeAttributes[] biomes;
     public GameObject debugScreen;
     public GameObject creativeInventoryWindow;
     public GameObject cursorSlot;
     public Settings settings;
+    public BlockType[] blockTypes;
 
     public Vector3 spawnPosition;
     public ChunkCoord playerLastChunkCoord;
@@ -37,6 +32,13 @@ public class World : MonoBehaviour
     ConcurrentQueue<ChunkCoord> chunksToCreate = new ConcurrentQueue<ChunkCoord>();
     ConcurrentQueue<Chunk> chunksToPopulate = new ConcurrentQueue<Chunk>();
     Queue<Queue<VoxelMod>> modifications = new Queue<Queue<VoxelMod>>();
+    // Voxel mods (tree blocks) that landed in a chunk which does not exist yet.
+    // Creating that chunk on the spot would cascade: it populates, grows its own
+    // border trees, which spill into further chunks, which get created, until most
+    // of the world is generated regardless of view distance. Instead the mods wait
+    // here until CheckViewDistance decides the chunk is genuinely in range.
+    // Written on the worker thread and read on the main thread, so it needs a lock.
+    Dictionary<ChunkCoord, Queue<VoxelMod>> pendingModifications = new Dictionary<ChunkCoord, Queue<VoxelMod>>();
     // Written (UpdateChunk) on the worker thread and read (Update) on the main
     // thread, so it must be thread-safe for the same reason as the two above.
     public ConcurrentQueue<Chunk> chunksToDraw = new ConcurrentQueue<Chunk>();
@@ -45,11 +47,76 @@ public class World : MonoBehaviour
     Thread ChunkUpdateThread;
     public object ChunkUpdateThreadLock = new object();
 
+
+    
+    [Header("Time Settings")]
+    public float globalLightLevel;
+    public float dayTime = 0f;
+    public bool inTimeTransition = false;
+    public int dayNight = -1;
+    public Color day;
+    public Color night;
+
     // Called by Chunk.Init on the main thread; the worker thread does the actual
     // population via ThreadedUpdate.
     public void QueueForPopulation(Chunk chunk)
     {
+        // Hand over anything that was buffered for this coord while the chunk did
+        // not exist. UpdateChunk drains chunk.modifications after PopulateVoxelMap
+        // has run, so these correctly overwrite the generated terrain.
+        Queue<VoxelMod> pending = null;
+        lock (pendingModifications)
+        {
+            if (pendingModifications.TryGetValue(chunk.chunkCoord, out pending))
+            {
+                pendingModifications.Remove(chunk.chunkCoord);
+            }
+        }
+
+        if (pending != null)
+        {
+            lock (chunk.modifications)
+            {
+                while (pending.Count > 0)
+                {
+                    chunk.modifications.Enqueue(pending.Dequeue());
+                }
+            }
+        }
+
         chunksToPopulate.Enqueue(chunk);
+    }
+
+    public void DayNightCycle()
+    {
+        if (inTimeTransition)
+        {
+            globalLightLevel += Time.deltaTime * (1/settings.timeTransitionLength) * dayNight;
+
+            // Reverse on the value we just produced, not the previous frame's, and clamp
+            // so an overshoot can't sit outside [0,1] and flip the sign again next frame.
+            if (globalLightLevel >= 1f)
+            {
+                globalLightLevel = 1f;
+                dayNight = -1;
+                inTimeTransition = false;
+            }
+            else if (globalLightLevel <= 0f)
+            {
+                globalLightLevel = 0f;
+                dayNight = 1;
+                inTimeTransition = false;
+            }
+        }
+        else if (dayTime < settings.dayLength)
+        {
+            dayTime += Time.deltaTime;
+        }
+        else
+        {
+            inTimeTransition = true;
+            dayTime = 0;
+        }
     }
 
     void BuildFaceUVCache()
@@ -160,8 +227,8 @@ public class World : MonoBehaviour
 
     private void Start()
     {
-        //string jsonExport = JsonUtility.ToJson(settings);
-        //File.WriteAllText(Application.dataPath + "/settings.cfg", jsonExport);
+        // string jsonExport = JsonUtility.ToJson(settings);
+        // File.WriteAllText(Application.dataPath + "/settings.cfg", jsonExport);
 
         string jsonImport = File.ReadAllText(Application.dataPath + "/settings.cfg");
         settings = JsonUtility.FromJson<Settings>(jsonImport);
@@ -246,12 +313,26 @@ public class World : MonoBehaviour
 
     public void Update()
     {
+        if (settings.doDaylightCycle)
+        {
+            DayNightCycle();
+        }
+        // Must run every frame: the shader global is a one-way push, so without this
+        // any change to globalLightLevel (the cycle above, or an Inspector edit) is
+        // invisible after the initial push in Start.
+        SetGlobalLightValue();
 
         if (!GetChunkCoordFromVector3(player.position).Equals(playerLastChunkCoord))
         {
             CheckViewDistance();
         }
-        if (chunksToCreate.TryDequeue(out ChunkCoord c))
+        // Init is cheap (a GameObject plus a queue push; the expensive population
+        // happens on the worker thread), so run it under a time budget rather than
+        // one per frame, which made the startup backlog take hundreds of frames to
+        // even reach the worker.
+        float initBudgetEnd = Time.realtimeSinceStartup + 0.004f;
+        while (Time.realtimeSinceStartup < initBudgetEnd
+               && chunksToCreate.TryDequeue(out ChunkCoord c))
         {
             chunks[c.x, c.z].Init();
         }
@@ -283,16 +364,10 @@ public class World : MonoBehaviour
 
     void GenerateWorld()
     {
-        for (int x = VoxelData.WorldSizeInChunks/2 - settings.viewDistance/2; x < VoxelData.WorldSizeInChunks/2 + settings.viewDistance/2; x++)
-        {
-            for (int z = VoxelData.WorldSizeInChunks/2 - settings.viewDistance/2; z < VoxelData.WorldSizeInChunks/2 + settings.viewDistance/2; z++)
-            {
-                ChunkCoord thisChunk = new ChunkCoord(x,z);
-                chunks[x, z] = new Chunk(thisChunk, this);
-                chunksToCreate.Enqueue(thisChunk);
-            }
-        }
-
+        // CheckViewDistance creates every chunk in range of the player, so there is
+        // no separate pre-pass. The loop that used to be here was centred on the
+        // world origin and used half the radius, so it disagreed with the range
+        // CheckViewDistance then loaded anyway.
         player.position = spawnPosition;
         CheckViewDistance();
     }
@@ -341,9 +416,8 @@ public class World : MonoBehaviour
                 didWork = true;
             }
 
-            if (!applyingModifications)
+            if (!applyingModifications && ApplyModifications())
             {
-                ApplyModifications();
                 didWork = true;
             }
             // Count is read under the lock because EditVoxel mutates this list from
@@ -373,9 +447,12 @@ public class World : MonoBehaviour
         ChunkUpdateThread.Abort();
     }
 
-    void ApplyModifications()
+    // Returns whether there was anything to apply, so ThreadedUpdate can sleep
+    // instead of spinning a core when the queue is empty.
+    bool ApplyModifications()
     {
         applyingModifications = true;
+        bool didWork = false;
         while (modifications.Count > 0)
         {
             Queue<VoxelMod> queue;
@@ -388,6 +465,8 @@ public class World : MonoBehaviour
                 }
                 queue = modifications.Dequeue();
             }
+
+            didWork = true;
 
             while(queue.Count > 0)
             {
@@ -403,12 +482,22 @@ public class World : MonoBehaviour
                 {
                     continue;
                 }
-                if (chunks[c.x,c.z] == null)
-                {
-                    chunks[c.x, c.z] = new Chunk(c, this);
-                    chunksToCreate.Enqueue(c);
-                }
                 Chunk chunk = chunks[c.x, c.z];
+
+                // Buffer rather than create. See pendingModifications.
+                if (chunk == null)
+                {
+                    lock (pendingModifications)
+                    {
+                        if (!pendingModifications.TryGetValue(c, out Queue<VoxelMod> pending))
+                        {
+                            pending = new Queue<VoxelMod>();
+                            pendingModifications[c] = pending;
+                        }
+                        pending.Enqueue(v);
+                    }
+                    continue;
+                }
 
                 lock (chunk.modifications)
                 {
@@ -428,6 +517,7 @@ public class World : MonoBehaviour
             }
         }
         applyingModifications = false;
+        return didWork;
     }
 
     public ChunkCoord GetChunkCoordFromVector3(Vector3 pos)
@@ -710,6 +800,11 @@ public class Settings
 
     [Header("World Gen")]
     public int seed;
+
+    [Header("Time Settings")]
+    public bool doDaylightCycle;
+    public float dayLength;
+    public float timeTransitionLength;
 }
 
 public enum FloraType
