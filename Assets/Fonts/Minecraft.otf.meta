@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 2b960d5539cd3214e9f4dde22dd0c3b5
+guid: d63678b2a7d6ebc44ad7d6e00aef1449
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
@@ -9,12 +9,12 @@ TrueTypeFontImporter:
   characterPadding: 1
   includeFontData: 1
   fontNames:
-  - MinecraftCHMC
+  - Minecraft
   fallbackFontReferences: []
   customCharacters: 
   fontRenderingMode: 0
   ascentCalculationMode: 1
-  useLegacyBoundsCalculation: 0
+  useLegacyBoundsCalculation: 1
   shouldRoundAdvanceValue: 1
   userData: 
   assetBundleName: 

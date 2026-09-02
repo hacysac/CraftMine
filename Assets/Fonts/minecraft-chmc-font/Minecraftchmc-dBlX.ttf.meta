@@ -10,12 +10,11 @@ TrueTypeFontImporter:
   includeFontData: 1
   fontNames:
   - MinecraftCHMC
-  fallbackFontReferences:
-  - {fileID: 12800000, guid: 2b960d5539cd3214e9f4dde22dd0c3b5, type: 3}
+  fallbackFontReferences: []
   customCharacters: 
-  fontRenderingMode: 0
+  fontRenderingMode: 2
   ascentCalculationMode: 1
-  useLegacyBoundsCalculation: 0
+  useLegacyBoundsCalculation: 1
   shouldRoundAdvanceValue: 1
   userData: 
   assetBundleName: 

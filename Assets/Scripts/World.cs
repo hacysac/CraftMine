@@ -790,21 +790,25 @@ public class Settings
     [Header("Game Data")]
     public string version;
 
+    // Defaults, not zeros: a fresh Settings gets written straight to settings.cfg
+    // when no config exists yet, and dayLength/timeTransitionLength have no menu
+    // control to repair them afterwards (timeTransitionLength of 0 divides by zero
+    // in World.DayNightCycle).
     [Header("Performance")]
-    public int viewDistance;
-    public bool doChunkAnimation;
+    public int viewDistance = 8;
+    public bool doChunkAnimation = true;
 
     [Header("Controls")]
     [Range(0.5f, 10f)]
-    public float mouseSensitivity;
+    public float mouseSensitivity = 2f;
 
     [Header("World Gen")]
     public int seed;
 
     [Header("Time Settings")]
-    public bool doDaylightCycle;
-    public float dayLength;
-    public float timeTransitionLength;
+    public bool doDaylightCycle = true;
+    public float dayLength = 1200f;
+    public float timeTransitionLength = 50f;
 }
 
 public enum FloraType
