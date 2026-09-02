@@ -19,6 +19,7 @@ public class World : MonoBehaviour
     public GameObject cursorSlot;
     public Settings settings;
     public BlockType[] blockTypes;
+    public Clouds clouds;
 
     public Vector3 spawnPosition;
     public ChunkCoord playerLastChunkCoord;
@@ -241,8 +242,8 @@ public class World : MonoBehaviour
         Shader.SetGlobalFloat("minGlobalLightLevel", VoxelData.minLightLevel);
         Shader.SetGlobalFloat("maxGlobalLightLevel", VoxelData.maxLightLevel);
 
-        int spawnX = VoxelData.WorldSizeInVoxels / 2;
-        int spawnZ = VoxelData.WorldSizeInVoxels / 2;
+        int spawnX = VoxelData.WorldCenter;
+        int spawnZ = VoxelData.WorldCenter;
 
         int spawnY = 0;
 
@@ -535,6 +536,7 @@ public class World : MonoBehaviour
 
     void CheckViewDistance()
     {
+        clouds.UpdateClouds();
         List<ChunkCoord> previouslyActiveChunks = new List<ChunkCoord>(activeChunks);
         ChunkCoord playerChunkCoord = GetChunkCoordFromVector3(player.position);
         playerLastChunkCoord = playerChunkCoord;

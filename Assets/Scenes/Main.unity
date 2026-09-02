@@ -1424,6 +1424,7 @@ MonoBehaviour:
     bottomFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
     leftFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
     rightFaceTexture: {fileID: 21300000, guid: 9b81a17a99248764a9383270c544c5a8, type: 3}
+  clouds: {fileID: 1152826414}
   spawnPosition: {x: 0, y: 0, z: 0}
   globalLightLevel: 1
   dayTime: 0
@@ -1846,6 +1847,54 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 932eb8155e6e9744c8550f9c1058292b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIItemSlot
+--- !u!1 &1152826411
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1152826415}
+  - component: {fileID: 1152826414}
+  m_Layer: 0
+  m_Name: Clouds
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1152826414
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1152826411}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e53b299140ff6f4bbf0653fe3feaab0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Clouds
+  cloudHeight: 100
+  cloudPattern: {fileID: 2800000, guid: f89a44f11e78c1e4dada3f6701745c9e, type: 3}
+  cloudMaterial: {fileID: 2100000, guid: cf2b2d29695ba9540b5fe5df1821d07f, type: 2}
+  world: {fileID: 875963153}
+--- !u!4 &1152826415
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1152826411}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1804.0007, y: 0.00009, z: 3541.9094}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1201020235
 GameObject:
   m_ObjectHideFlags: 0
@@ -2896,3 +2945,4 @@ SceneRoots:
   - {fileID: 409092999}
   - {fileID: 2030635796}
   - {fileID: 886189850}
+  - {fileID: 1152826415}
